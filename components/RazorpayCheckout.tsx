@@ -50,6 +50,12 @@ const T: Record<string, L8> = {
   testHint: {
     en: "Razorpay test mode (no real money): UPI ID success@razorpay, or card 4111 1111 1111 1111 with any future date and CVV.",
     hi: "Razorpay टेस्ट मोड (असली पैसा नहीं): UPI ID success@razorpay, या कार्ड 4111 1111 1111 1111, कोई भी आगे की तारीख और CVV।",
+    bn: "Razorpay টেস্ট মোড (আসল টাকা নয়): UPI ID success@razorpay, বা কার্ড 4111 1111 1111 1111, যেকোনো ভবিষ্যতের তারিখ ও CVV।",
+    mr: "Razorpay चाचणी मोड (खरे पैसे नाहीत): UPI ID success@razorpay, किंवा कार्ड 4111 1111 1111 1111, कोणतीही पुढची तारीख आणि CVV.",
+    te: "Razorpay టెస్ట్ మోడ్ (నిజమైన డబ్బు కాదు): UPI ID success@razorpay, లేదా కార్డ్ 4111 1111 1111 1111, ఏదైనా భవిష్యత్ తేదీ మరియు CVV.",
+    ta: "Razorpay சோதனை முறை (உண்மையான பணம் இல்லை): UPI ID success@razorpay, அல்லது கார்டு 4111 1111 1111 1111, ஏதேனும் எதிர்கால தேதி மற்றும் CVV.",
+    or: "Razorpay ଟେଷ୍ଟ ମୋଡ (ପ୍ରକୃତ ଟଙ୍କା ନୁହେଁ): UPI ID success@razorpay, କିମ୍ବା କାର୍ଡ 4111 1111 1111 1111, ଯେକୌଣସି ଭବିଷ୍ୟତ ତାରିଖ ଓ CVV।",
+    kn: "Razorpay ಪರೀಕ್ಷಾ ಮೋಡ್ (ನಿಜವಾದ ಹಣ ಅಲ್ಲ): UPI ID success@razorpay, ಅಥವಾ ಕಾರ್ಡ್ 4111 1111 1111 1111, ಯಾವುದೇ ಮುಂದಿನ ದಿನಾಂಕ ಮತ್ತು CVV.",
   },
 };
 

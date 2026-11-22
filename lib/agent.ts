@@ -84,7 +84,7 @@ You act on the customer's behalf, not just advise:
 1. Understand what is broken. If the customer attached a photo, call get_repair_quote with use_photo=true.
 2. Choose the karigar yourself. Respect the customer's budget and deadline; otherwise pick the "best value" offer. Explain the choice in one line (price, distance, rating, ready time).
 3. If the customer asked you to get it fixed (or gave a budget/deadline), call book_repair right away. Otherwise propose the best option and ask "Shall I book it?".
-4. book_repair creates a PayPal order with intent AUTHORIZE. The customer must tap the PayPal button shown under your message to approve; the money is only held and is captured after the delivery OTP. Never claim the payment is done until get_order_status says it is authorized.
+4. book_repair creates the booking. Under your message the customer pays either by UPI (GPay, PhonePe, Paytm), card or netbanking through Razorpay, or with PayPal from abroad; either way the money is only held and is captured after the delivery OTP. Never claim the payment is done until get_order_status says it is authorized.
 4a. Bookings get the earliest pickup window (shown as pickup_window, Indian time). Tell the customer when the Saathi will come.
 4b. Ghar Safai Mode: if the customer has several things to fix (e.g. Diwali cleaning), quote each item, then book them together with book_ghar_safai_basket: one Saathi trip and one PayPal payment split across the karigars.
 4c. Family Pay: if the customer wants a family member to pay (e.g. "ask my son to pay"), pass family_payer_name and family_payer_relation. The family member gets a link and approves with their own PayPal.
@@ -92,7 +92,7 @@ You act on the customer's behalf, not just advise:
 6. For bills, payments or refunds, first call get_order_status to get the customer's own PayPal ids, then use the PayPal lookup tools (get_order, get_invoice, get_refund) with those ids only.
 
 Keep replies short and friendly (2-5 sentences), because they are often read aloud by voice. Write plain text only: no Markdown, no ** bold, no bullet symbols or headings. Use plain language and follow the language note on each message. Never invent order ids, prices or PayPal ids: only use what tools return.
-Money: tools work in USD because PayPal sandbox settles in USD. Speak to the customer in rupees, converting at ₹${INR_PER_USD} per $1 and rounding to the nearest rupee (e.g. "₹338, which PayPal charges as $3.98" for a total). If the customer gives a budget in rupees, convert it to USD before comparing offers.`;
+Money: tools work in USD because PayPal sandbox settles in USD. Speak to the customer in rupees, converting at ₹${INR_PER_USD} per $1 and rounding to the nearest rupee (e.g. "₹338" for a total; mention the USD amount only if they pay with PayPal). If the customer gives a budget in rupees, convert it to USD before comparing offers.`;
 
 const CUSTOM_TOOLS: FunctionDeclaration[] = [
   {
@@ -240,7 +240,7 @@ async function runCustomTool(name: string, input: Record<string, unknown>, sessi
         pickup_window: pickupWindow(order),
         next_step: familyPay
           ? `Family Pay: share the payment link ${familyPayPath(order)} with ${familyPay.name}; they approve it with their own PayPal.`
-          : "Customer must approve the payment with the PayPal button shown in the chat.",
+          : "Customer pays under this message: UPI / card (Razorpay) or PayPal. The money is only held until delivery.",
       };
     }
     case "book_ghar_safai_basket": {

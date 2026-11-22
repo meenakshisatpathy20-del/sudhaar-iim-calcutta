@@ -28,7 +28,7 @@ import { warrantyDays, warrantyDaysLeft } from "./warranty";
 import { activity, DEFAULT_PRIORITY, isOpenClaim, slaDue } from "./claims-shared";
 import { announceClaim, announceDecision } from "./claims";
 import { notifyOrder } from "./sms";
-import type { Account, Category, Complaint, DB, FamilyPay, Job, Karigar, Order, OrderEvent, OrderStatus, PickupSlot, Quote, Saathi } from "./types";
+import type { Account, Category, Complaint, DB, FamilyPay, Job, Karigar, Order, OrderEvent, OrderStatus, PickupSlot, Quote } from "./types";
 
 export class FlowError extends Error {
   constructor(message: string, public status = 400) {
@@ -117,11 +117,33 @@ export function offersFor(quote: Quote, at: { lat: number; lng: number } = DEMO_
   return offers;
 }
 
-/** A random Saathi among those who are online (any Saathi if everyone is offline). */
-function pickSaathi(saathis: Saathi[], offline: string[] = []) {
-  const online = saathis.filter((x) => !offline.includes(x.id));
-  const pool = online.length ? online : saathis;
-  return pool[Math.floor(Math.random() * pool.length)];
+/** Trips a Saathi is already on (paid, not yet delivered). */
+const ACTIVE_TRIP: OrderStatus[] = ["authorized", "picked_up", "at_karigar", "repairing", "repaired", "out_for_delivery"];
+/** A live location older than this is not trusted for distance. */
+const FRESH_LOCATION_MS = 2 * 60 * 60 * 1000;
+/** Distance assumed for a Saathi whose position is unknown (they are somewhere in the service area). */
+const UNKNOWN_KM = 3;
+/** Each trip already in hand counts like this many extra km, so work is spread fairly. */
+const KM_PER_ACTIVE_TRIP = 1.5;
+
+/**
+ * The best online Saathi for a pickup at `at`: the nearest one by live location, with trips already in
+ * hand counted as extra distance so one person isn't sent everything; ties go to the higher rating.
+ * Falls back to every Saathi if all are offline.
+ */
+function pickSaathi(db: DB, at: { lat: number; lng: number }) {
+  const offline = db.offline ?? [];
+  const online = db.saathis.filter((x) => !offline.includes(x.id));
+  const pool = online.length ? online : db.saathis;
+  const scored = pool.map((x) => {
+    const loc = db.saathiLocations?.[x.id];
+    const fresh = loc && Date.now() - Date.parse(loc.at) < FRESH_LOCATION_MS;
+    const km = fresh ? haversineKm(at, loc) : UNKNOWN_KM;
+    const trips = db.orders.filter((o) => o.saathiId === x.id && o.mode === "pickup" && ACTIVE_TRIP.includes(o.status)).length;
+    return { x, score: km + trips * KM_PER_ACTIVE_TRIP };
+  });
+  scored.sort((a, b) => a.score - b.score || b.x.rating - a.x.rating);
+  return scored[0].x;
 }
 
 // ---------- Booking + PayPal authorize ----------
@@ -168,7 +190,7 @@ export async function createOrder(input: {
   const off = discountsFor(db, input.customer, offer.price, offer.pickupFee, false, input.coupon);
   const split = computeSplit(offer.price, offer.pickupFee, donation, off.amount);
   const mode = serviceModeFor(quote.category);
-  const saathi = pickSaathi(db.saathis, db.offline);
+  const saathi = pickSaathi(db, customer);
   const order: Order = {
     id: id("SD"),
     kind: "single",
@@ -307,7 +329,7 @@ export async function createBasketOrder(input: {
   const donation = Math.min(5, Math.max(0, round2(input.donation ?? 0)));
   const off = discountsFor(db, input.customer, repairCharge, fee, true, input.coupon);
   const split = computeSplit(repairCharge, fee, donation, off.amount);
-  const saathi = pickSaathi(db.saathis, db.offline);
+  const saathi = pickSaathi(db, customer);
   const order: Order = {
     id: id("SD"),
     kind: "basket",
@@ -1130,7 +1152,7 @@ async function createWarrantyOrder(originalId: string, claimId: string): Promise
   const rr = await updateDB((db) => {
     const o = db.orders.find((x) => x.id === originalId)!;
     const c = o.complaints.find((x) => x.id === claimId)!;
-    const saathi = pickSaathi(db.saathis, db.offline);
+    const saathi = pickSaathi(db, o.customer);
     const order: Order = {
       id: id("SD"),
       kind: "single",

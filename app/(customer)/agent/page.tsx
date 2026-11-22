@@ -13,7 +13,7 @@ import { useLang } from "@/components/LanguageProvider";
 import { FamilyPayShare } from "@/components/FamilyPay";
 import { LangToggle } from "@/components/LangToggle";
 import { MicButton } from "@/components/MicButton";
-import { PayPalCheckout } from "@/components/PayPalCheckout";
+import { PaymentChooser } from "@/components/RazorpayCheckout";
 import { StatusPill } from "@/components/StatusPill";
 import { useAppConfig } from "@/components/useAppConfig";
 import { speak, stopSpeaking } from "@/components/voice";
@@ -210,7 +210,7 @@ function AgentCardView({ card }: { card: AgentCard }) {
   if (card.type === "refund")
     return (
       <div className="rounded-2xl bg-muted p-3 text-xs">
-        PayPal refund {rupees(card.amount)} issued <span className="font-mono">{card.refundId}</span>
+        Refund {rupees(card.amount)} issued <span className="font-mono">{card.refundId}</span>
       </div>
     );
   return <BookingCard card={card} />;
@@ -236,7 +236,7 @@ function BookingCard({ card }: { card: Extract<AgentCard, { type: "booking" }> }
         {order && <StatusPill status={order.status} />}
       </div>
       {order?.status === "awaiting_payment" && card.familyPayer && <FamilyPayShare orderId={card.orderId} token={order.familyPay?.token} name={card.familyPayer} item={order.item} total={rupees(card.total)} />}
-      {order?.status === "awaiting_payment" && !card.familyPayer && card.paypalOrderId && <PayPalCheckout orderId={card.orderId} paypalOrderId={card.paypalOrderId} total={card.total} onApproved={refresh} />}
+      {order?.status === "awaiting_payment" && !card.familyPayer && <PaymentChooser order={order} onApproved={refresh} />}
       {order && order.status !== "awaiting_payment" && (
         <p className="text-muted-foreground">
           {t("agentHeld")} <b className="font-mono text-foreground">{order.pickupOtp}</b> ·{" "}
