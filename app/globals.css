@@ -1,0 +1,141 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Sudhaar "neighbourhood shop" theme: cream paper, marigold, terracotta and a soft teal. */
+:root {
+  --radius: 1rem;
+  --background: #fff8ee;
+  --foreground: #2b1d14;
+  --card: #ffffff;
+  --card-foreground: #2b1d14;
+  --popover: #ffffff;
+  --popover-foreground: #2b1d14;
+  --primary: #d9572b;
+  --primary-foreground: #ffffff;
+  --secondary: #fbe9d3;
+  --secondary-foreground: #2b1d14;
+  --muted: #f7ecdd;
+  --muted-foreground: #7a6553;
+  --accent: #f7ecdd;
+  --accent-foreground: #2b1d14;
+  --destructive: #c2362f;
+  --border: #ecdcc6;
+  --input: #e6d3bb;
+  --ring: #d9572b;
+  --gold: #c97a08;
+  --gold-foreground: #ffffff;
+  --marigold: #f4a62a;
+  --teal: #1f8a7a;
+  --paypal: #ffc439;
+  --paypal-blue: #003087;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-marigold: var(--marigold);
+  --color-teal: var(--teal);
+  --color-paypal: var(--paypal);
+  --color-paypal-blue: var(--paypal-blue);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Inter Variable", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Oriya", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Baloo 2 Variable", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Oriya", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(40rem 26rem at 0% 0%, #fde2c4 0%, transparent 60%),
+      radial-gradient(36rem 24rem at 100% 10%, #d8efe9 0%, transparent 60%),
+      radial-gradient(44rem 30rem at 50% 110%, #fbe7d3 0%, transparent 65%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+}
+
+/* White paper card with a soft warm shadow. */
+@utility paper {
+  @apply border border-border/80 bg-card shadow-[0_1px_2px_rgba(120,70,20,0.05),0_12px_32px_-16px_rgba(120,70,20,0.30)];
+}
+/* Cards that are links lift slightly on hover. */
+a[data-slot="card"], a > [data-slot="card"] {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+a[data-slot="card"]:hover, a:hover > [data-slot="card"] {
+  transform: translateY(-2px);
+  box-shadow: 0 1px 2px rgba(120, 70, 20, 0.06), 0 18px 40px -18px rgba(120, 70, 20, 0.38);
+}
+::selection { background: #f7c9a8; color: #2b1d14; }
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes ping-soft {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes draw {
+  from { stroke-dashoffset: var(--len, 400); }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes flicker {
+  0%, 100% { transform: scaleY(1) translateY(0); opacity: 1; }
+  50% { transform: scaleY(1.12) translateY(-1px); opacity: 0.85; }
+}
+.doodle-wiggle { animation: wiggle 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.doodle-float { animation: float-slow 4s ease-in-out infinite; }
+.doodle-draw { stroke-dasharray: var(--len, 400); animation: draw 2.4s ease-out forwards; }
+.doodle-flame { animation: flicker 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: bottom center; }
+@media (prefers-reduced-motion: reduce) {
+  .doodle-wiggle, .doodle-float, .doodle-draw, .doodle-flame { animation: none; stroke-dasharray: none; }
+}
+
+/* Map labels under karigar pins (Leaflet tooltips) */
+.leaflet-tooltip.sudhaar-map-tip { border: 0; border-radius: 0.5rem; padding: 2px 6px; font-size: 10px; font-weight: 600; color: #2b1d14; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
+.leaflet-tooltip.sudhaar-map-tip::before { display: none; }
+
+/* Some Indian-language words are very long: wrap them rather than push the page sideways. */
+body { overflow-wrap: break-word; }
+@media (max-width: 480px) {
+  html:lang(ta) h1 { font-size: 1.875rem; }
+}

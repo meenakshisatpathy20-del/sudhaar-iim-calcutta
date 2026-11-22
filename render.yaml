@@ -1,0 +1,59 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# New -> Blueprint -> pick this repo. Fill in the secret env vars when prompted.
+services:
+  - type: web
+    name: sudhaar
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_KARIGAR_EMAIL
+        sync: false
+      - key: PAYPAL_SAATHI_EMAIL
+        sync: false
+      - key: PAYPAL_CUSTOMER_EMAIL
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: PAYPAL_DEMO_BUYER_EMAIL
+        sync: false
+      - key: PAYPAL_DEMO_BUYER_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # Bolna phone line (docs/BOLNA.md). VOICE_API_TOKEN: a long random secret you also give Bolna.
+      - key: APP_URL
+        sync: false
+      - key: VOICE_API_TOKEN
+        sync: false
+      - key: VOICE_PHONE_NUMBER
+        sync: false
+      - key: BOLNA_API_KEY
+        sync: false
+      - key: BOLNA_AGENT_ID
+        sync: false
+      # SMS with Twilio (optional; without it texts are only logged in the admin console)
+      - key: SMS_PROVIDER
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      # Keeps bookings, claims and photos across restarts (free Upstash Redis)
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      # Signs login cookies; generated once by Render so logins survive restarts
+      - key: SESSION_SECRET
+        generateValue: true

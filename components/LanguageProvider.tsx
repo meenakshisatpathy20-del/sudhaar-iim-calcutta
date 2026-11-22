@@ -1,0 +1,56 @@
+"use client";
+
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { LANGS, STRINGS, type Lang, type StringKey } from "@/lib/i18n";
+
+type Vars = Record<string, string | number>;
+type Ctx = { lang: Lang; setLang: (l: Lang) => void; t: (k: StringKey, vars?: Vars) => string; speakReplies: boolean; setSpeakReplies: (v: boolean) => void };
+const LanguageContext = createContext<Ctx | null>(null);
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [lang, setLangState] = useState<Lang>("en");
+  const [speakReplies, setSpeakState] = useState(true);
+
+  useEffect(() => {
+    try {
+      const l = localStorage.getItem("sudhaar.lang");
+      if (LANGS.some((x) => x.code === l)) setLangState(l as Lang);
+      if (localStorage.getItem("sudhaar.speak") === "0") setSpeakState(false);
+    } catch {
+      // storage unavailable: keep defaults
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
+  const setLang = useCallback((l: Lang) => {
+    setLangState(l);
+    try {
+      localStorage.setItem("sudhaar.lang", l);
+    } catch {}
+  }, []);
+  const setSpeakReplies = useCallback((v: boolean) => {
+    setSpeakState(v);
+    try {
+      localStorage.setItem("sudhaar.speak", v ? "1" : "0");
+    } catch {}
+  }, []);
+  // Optional {placeholders}, e.g. t("oFixedBy", { names: "Mohan", date }).
+  const t = useCallback(
+    (k: StringKey, vars?: Vars) => {
+      const text = STRINGS[lang][k] ?? STRINGS.en[k] ?? k;
+      return vars ? text.replace(/\{(\w+)\}/g, (m, v: string) => (v in vars ? String(vars[v]) : m)) : text;
+    },
+    [lang],
+  );
+
+  return <LanguageContext.Provider value={{ lang, setLang, t, speakReplies, setSpeakReplies }}>{children}</LanguageContext.Provider>;
+}
+
+export function useLang() {
+  const ctx = useContext(LanguageContext);
+  if (!ctx) throw new Error("useLang must be used inside LanguageProvider");
+  return ctx;
+}

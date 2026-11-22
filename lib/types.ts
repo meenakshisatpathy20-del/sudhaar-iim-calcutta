@@ -1,0 +1,502 @@
+export type Category =
+  | "shoes"
+  | "bags"
+  | "clothes"
+  | "small-appliance"
+  | "electronics"
+  | "furniture"
+  | "plumbing"
+  | "electrical";
+
+export type ItemSize = "small" | "medium" | "large";
+
+export type ServiceMode = "pickup" | "home-visit";
+
+export interface Karigar {
+  id: string;
+  name: string;
+  shop: string;
+  skills: Category[];
+  rating: number;
+  jobsDone: number;
+  lat: number;
+  lng: number;
+  area: string;
+  languages: string[];
+  /** Multiplier on the base repair price (0.9 = 10% cheaper than average). */
+  priceFactor: number;
+  /** Typical turnaround in days. */
+  turnaroundDays: number;
+  verified: boolean;
+  /** PayPal sandbox email that receives payouts. */
+  payoutEmail: string;
+  avatarColor: string;
+  yearsExperience: number;
+  /** One line in the karigar's own words. */
+  bio: string;
+  craft: string;
+  services: { name: string; price: number }[];
+  reviews: { name: string; rating: number; text: string; at?: string; /** From a real, delivered Sudhaar order. */ verified?: boolean }[];
+  /** Joined through the onboarding flow (not demo seed data). */
+  onboarded?: boolean;
+  /** How many ratings `rating` is based on; filled in from orders (lib/reviews.ts). */
+  ratingCount?: number;
+}
+
+/** A karigar ("Join as a karigar") or Saathi ("Become a Repair Saathi") applying, reviewed by the Sudhaar team. */
+export interface KarigarApplication {
+  id: string;
+  kind?: "karigar" | "saathi";
+  createdAt: string;
+  name: string;
+  phone: string;
+  shop: string;
+  craft: string;
+  area: string;
+  skills: Category[];
+  yearsExperience: number;
+  languages: string[];
+  bio: string;
+  /** Optional: without it, sandbox payouts go to the demo karigar account. */
+  payoutEmail?: string;
+  /** Which ID they can show. We never store ID numbers; staff verify in person or via DigiLocker. */
+  idType: "aadhaar" | "voter" | "driving" | "pan" | "none";
+  status: "pending" | "approved" | "rejected";
+  /** Karigars: ID, shop visit, trial repair. Saathis: ID, OTP-handover training, trial trip. */
+  checks: Partial<Record<"idVerified" | "shopVisited" | "trialRepair" | "trained" | "trialTrip", boolean>>;
+  karigarId?: string;
+  saathiId?: string;
+  decidedAt?: string;
+  /** Saathi applicants only. */
+  vehicle?: SaathiVehicle;
+  hours?: ("mornings" | "evenings" | "weekends" | "full_day")[];
+  student?: boolean;
+}
+
+export interface Saathi {
+  id: string;
+  name: string;
+  rating: number;
+  payoutEmail: string;
+  /** Joined through "Become a Repair Saathi" (not demo seed data). */
+  onboarded?: boolean;
+  area?: string;
+  vehicle?: SaathiVehicle;
+}
+
+/** A Saathi's last known position, sent from the Saathi app while they share their location. */
+export interface SaathiLocation {
+  lat: number;
+  lng: number;
+  at: string;
+  /** From the labelled "demo ride" button rather than the phone's GPS. */
+  simulated?: boolean;
+}
+
+/** One call on the Bolna phone line, as reported by Bolna after the call. */
+export interface VoiceCall {
+  id: string;
+  at: string;
+  from?: string;
+  status?: string;
+  durationSec?: number;
+  summary?: string;
+  transcript?: string;
+  orderIds?: string[];
+  /** Calls Sudhaar placed itself (payment nudges, pickup reminders, call-me) are "outbound". */
+  direction?: "inbound" | "outbound";
+  /** Outbound: who was called (10 digits) and why. */
+  to?: string;
+  reason?: string;
+  /** The customer account this call belongs to, when known. */
+  customerId?: string;
+}
+
+/** A caller asked for a person. The Sudhaar team calls them back and marks it done. */
+export interface CallbackRequest {
+  id: string;
+  at: string;
+  phone: string;
+  name?: string;
+  reason: string;
+  orderId?: string;
+  customerId?: string;
+  status: "open" | "done";
+  doneAt?: string;
+  doneBy?: string;
+}
+
+/** A discount code. The discount comes out of Sudhaar's own share, never the karigar's or Saathi's. */
+export interface Coupon {
+  code: string;
+  description: string;
+  kind: "flat" | "percent";
+  /** Rupees for "flat", percent of the repair price for "percent". */
+  value: number;
+  /** Upper limit in rupees for percent coupons. */
+  maxInr?: number;
+  minOrderInr?: number;
+  firstOrderOnly?: boolean;
+  basketOnly?: boolean;
+  active: boolean;
+  /** Paid bookings that used it. */
+  uses: number;
+  maxUses?: number;
+  expiresAt?: string;
+  createdAt: string;
+}
+
+/** Sudhaar Care: a monthly PayPal subscription that covers doorstep pickup fees. */
+export interface CareMembership {
+  subscriptionId: string;
+  status: "APPROVAL_PENDING" | "APPROVED" | "ACTIVE" | "SUSPENDED" | "CANCELLED" | "EXPIRED";
+  mode: "sandbox" | "simulated";
+  startedAt: string;
+  updatedAt: string;
+  nextBillingAt?: string;
+  lastPaymentAt?: string;
+}
+
+export type SaathiVehicle = "bicycle" | "scooter" | "motorbike" | "walk";
+
+export interface Quote {
+  id: string;
+  createdAt: string;
+  item: string;
+  category: Category;
+  size: ItemSize;
+  issue: string;
+  repairable: boolean;
+  repairLow: number;
+  repairHigh: number;
+  newPrice: number;
+  repairDays: number;
+  confidence: "low" | "medium" | "high";
+  notes: string;
+  photo?: string;
+  description?: string;
+  source: "gemini" | "simulated";
+}
+
+export type OrderStatus =
+  | "awaiting_payment"
+  | "authorized"
+  | "picked_up"
+  | "at_karigar"
+  | "repairing"
+  | "repaired"
+  | "out_for_delivery"
+  | "delivered"
+  | "paid_out"
+  | "cancelled";
+
+export interface OrderEvent {
+  at: string;
+  status?: OrderStatus;
+  actor: "customer" | "saathi" | "karigar" | "system" | "agent" | "admin";
+  message: string;
+  /** PayPal ids / debug ids, shown on the order page so judges can verify in the sandbox. */
+  ref?: string;
+  kind?: "info" | "paypal" | "ai" | "error";
+}
+
+export interface PriceChange {
+  jobId?: string;
+  item: string;
+  /** Repair price in USD before and after (pickup fee and tool fund don't change). */
+  from: number;
+  to: number;
+  reason: string;
+  status: "pending" | "awaiting_payment" | "approved" | "declined";
+  requestedAt: string;
+  decidedAt?: string;
+  /** A price increase is held as a second PayPal authorization for just the difference. */
+  topUp?: { amount: number; paypalOrderId?: string; authorizationId?: string; captureId?: string };
+}
+
+export interface PayoutLine {
+  to: "karigar" | "saathi";
+  /** A thank-you tip from the customer, paid separately after delivery. */
+  kind?: "tip";
+  /** Which karigar / Saathi was paid, for their earnings history. */
+  partnerId?: string;
+  /** Who received it (shop or Saathi name), for baskets paying several karigars. */
+  label?: string;
+  receiver: string;
+  amount: number;
+  status: string;
+  payoutItemId?: string;
+}
+
+export type ClaimStatus = "open" | "in_review" | "awaiting_customer" | "awaiting_karigar" | "resolved" | "rejected" | "withdrawn";
+export type ClaimPriority = "low" | "medium" | "high" | "critical";
+export type ClaimActor = Role | "system";
+
+/** A message on a claim. Internal notes are seen only by the Sudhaar team. */
+export interface ClaimMessage {
+  id: string;
+  at: string;
+  by: ClaimActor;
+  name: string;
+  text: string;
+  internal?: boolean;
+}
+
+export interface ClaimEvidence {
+  url: string;
+  at: string;
+  by: Role;
+  name: string;
+  caption?: string;
+}
+
+/** One line of the claim's activity log: who did what, with remarks. */
+export interface ClaimActivity {
+  at: string;
+  by: ClaimActor;
+  name: string;
+  action: string;
+  remarks?: string;
+}
+
+/** A Resolve Hub warranty claim. Fields after `resolution` were added later, so old claims may lack them. */
+export interface Complaint {
+  id: string;
+  createdAt: string;
+  issue: "repair_failed" | "damaged" | "overcharged" | "delayed" | "missing";
+  details: string;
+  photo?: string;
+  ai?: {
+    recommendation: "re_repair" | "partial_refund" | "full_refund" | "reject";
+    refundAmount: number;
+    reasoning: string;
+    source: "gemini" | "simulated";
+  };
+  resolution?: {
+    action: "re_repair" | "refund" | "rejected";
+    amount?: number;
+    refundId?: string;
+    at: string;
+    remarks?: string;
+    /** Free re-repair: the ₹0 pickup order created for it. */
+    reRepairOrderId?: string;
+  };
+  status?: ClaimStatus;
+  priority?: ClaimPriority;
+  /** When the Sudhaar team promises a decision, from the priority. */
+  slaDueAt?: string;
+  channel?: "web" | "phone" | "agent";
+  evidence?: ClaimEvidence[];
+  thread?: ClaimMessage[];
+  activity?: ClaimActivity[];
+  assignedTo?: { id: string; name: string };
+  closedAt?: string;
+}
+
+/** An in-site notification (the bell in the header). Text is an i18n key so it shows in the reader's language. */
+export interface Notification {
+  id: string;
+  accountId: string;
+  at: string;
+  key: string;
+  params: Record<string, string>;
+  href: string;
+  read?: boolean;
+}
+
+/** The before/after photo check that gates the PayPal capture. */
+export interface CompletionCheck {
+  passed: boolean;
+  reasoning: string;
+  source: "gemini" | "simulated" | "admin";
+  /** True when the AI could not decide (or failed) and a Sudhaar reviewer must compare the photos. */
+  needsReview?: boolean;
+}
+
+/** One item inside a Ghar Safai basket order. */
+export interface Job {
+  id: string;
+  quoteId: string;
+  item: string;
+  category: Category;
+  size: ItemSize;
+  issue: string;
+  karigarId: string;
+  price: number;
+  newPrice: number;
+  beforePhoto?: string;
+  afterPhoto?: string;
+  status: "waiting" | "repairing" | "repaired";
+  completionCheck?: CompletionCheck;
+}
+
+/** The customer's rating of a karigar after delivery. */
+export interface Rating {
+  karigarId: string;
+  stars: number;
+  text: string;
+  at: string;
+}
+
+/** A thank-you tip: paid now with PayPal (intent CAPTURE), then 100% paid out to the karigar. */
+export interface Tip {
+  id: string;
+  karigarId: string;
+  /** USD, as PayPal handles it. */
+  amount: number;
+  status: "awaiting_payment" | "paid";
+  paypalOrderId?: string;
+  captureId?: string;
+  payoutBatchId?: string;
+  createdAt: string;
+  paidAt?: string;
+}
+
+/** When the Saathi should come (or the plumber/electrician visit), as an ISO time window. */
+export interface PickupSlot {
+  start: string;
+  end: string;
+}
+
+/** Family Pay: someone else (e.g. a son in another city) approves the PayPal payment. */
+export interface FamilyPay {
+  /** Secret in the payment link, so a relative can pay without an account but nobody can guess other orders. */
+  token?: string;
+  name: string;
+  relation: string;
+  /** Payer's 10-digit mobile (phone bookings): the PayPal link is sent here by SMS. */
+  phone?: string;
+  email?: string;
+  paidBy?: string;
+  paidAt?: string;
+}
+
+export interface Order {
+  id: string;
+  /** "basket" = Ghar Safai Mode: several items, one pickup, one PayPal payment. */
+  kind?: "single" | "basket";
+  jobs?: Job[];
+  familyPay?: FamilyPay;
+  createdAt: string;
+  status: OrderStatus;
+  quoteId: string;
+  item: string;
+  category: Category;
+  size: ItemSize;
+  issue: string;
+  mode: ServiceMode;
+  karigarId: string;
+  saathiId: string;
+  /** The customer account that booked it; only they (and admins) can see the order. */
+  customerId?: string;
+  customer: { name: string; email: string; address: string; lat: number; lng: number };
+  distanceKm: number;
+  repairCharge: number;
+  pickupFee: number;
+  donation: number;
+  total: number;
+  currency: "USD";
+  split: { karigar: number; saathi: number; platform: number; donation: number };
+  pickupOtp: string;
+  deliveryOtp: string;
+  paypal: {
+    mode: "sandbox" | "simulated";
+    orderId?: string;
+    authorizationId?: string;
+    captureId?: string;
+    payoutBatchId?: string;
+    invoiceId?: string;
+    invoiceUrl?: string;
+    refunds: { id: string; amount: number; status: string }[];
+    /** Amount the main authorization holds, and how much of it was captured. */
+    heldAmount?: number;
+    capturedAmount?: number;
+  };
+  /** Coupon and Sudhaar Care discounts (USD). PayPal shows them as a discount on the order. */
+  discount?: { coupon?: { code: string; amount: number }; care?: number };
+  /** Secret in the public tracking link (/track/ID?t=…), so tracking pages can't be guessed. */
+  trackToken?: string;
+  /** The karigar's price change after inspecting the item; the customer must approve it. */
+  priceChange?: PriceChange;
+  pickupSlot?: PickupSlot;
+  ratings?: Rating[];
+  tips?: Tip[];
+  beforePhoto?: string;
+  afterPhoto?: string;
+  completionCheck?: CompletionCheck;
+  payouts: PayoutLine[];
+  complaints: Complaint[];
+  events: OrderEvent[];
+  /** "phone": booked on the Bolna phone line. */
+  bookedBy: "customer" | "agent" | "phone";
+  /** A free warranty re-repair of this earlier order (₹0, no PayPal). */
+  warrantyFor?: string;
+  /** What the background conductor already did for this order (reminders, calls), so nothing repeats. */
+  nudges?: { payReminders?: number; payCall?: boolean; expiredNotice?: boolean; pickupSoon?: boolean };
+}
+
+export interface DB {
+  karigars: Karigar[];
+  saathis: Saathi[];
+  quotes: Quote[];
+  orders: Order[];
+  webhooks: { at: string; type: string; resource?: string; verified: boolean; eventId?: string; duplicate?: boolean }[];
+  applications: KarigarApplication[];
+  accounts: Account[];
+  /** Karigar and Saathi ids that switched themselves offline (no new jobs). */
+  offline?: string[];
+  coupons?: Coupon[];
+  /** Calls on the Bolna phone line (from Bolna's post-call webhook). */
+  voiceCalls?: VoiceCall[];
+  /** The PayPal catalog product and billing plan behind Sudhaar Care, created on first use. */
+  care?: { productId?: string; planId?: string; mode?: "sandbox" | "simulated"; /** Start of the PayPal Client ID the plan was made with. */ owner?: string };
+  saathiLocations?: Record<string, SaathiLocation>;
+  notifications?: Notification[];
+  /** Every SMS Sudhaar sent or would have sent (OTPs masked), newest first. */
+  smsLog?: SmsMessage[];
+  callbacks?: CallbackRequest[];
+}
+
+/** One SMS. Without an SMS provider configured, messages are only logged ("simulated"). */
+export interface SmsMessage {
+  id: string;
+  at: string;
+  /** Masked, e.g. ••••••3210 */
+  to: string;
+  kind: string;
+  orderId?: string;
+  /** The text with any OTP replaced by ••••. */
+  text: string;
+  /** The account texted, when it is a Sudhaar account (for the customer timeline). */
+  accountId?: string;
+  status: "sent" | "simulated" | "failed";
+  provider: string;
+  ref?: string;
+  error?: string;
+}
+
+export type Role = "customer" | "karigar" | "saathi" | "admin";
+
+/** A login. Phone + PIN; the PIN is stored only as a scrypt hash. */
+export interface Account {
+  id: string;
+  role: Role;
+  name: string;
+  /** 10-digit Indian mobile number, digits only. */
+  phone: string;
+  pinHash: string;
+  createdAt: string;
+  /** Customers: where pickups happen. */
+  address?: string;
+  lat?: number;
+  lng?: number;
+  /** Partners: which karigar / Saathi profile this login runs. */
+  karigarId?: string;
+  saathiId?: string;
+  /** Shared demo login listed for judges. */
+  demo?: boolean;
+  /** Customers: Sudhaar Care subscription. */
+  care?: CareMembership;
+  /** Created on the phone line (the caller hasn't used the website yet). */
+  viaPhone?: boolean;
+}
