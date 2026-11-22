@@ -29,6 +29,9 @@ export function MoneyOverview({ m, orders, activity, webhooks, carePlan }: { m: 
     ["Subscriptions v1", "Care members (active)", m.careMembers],
     ["Webhooks v1 · verify signature", "Events received", webhooks],
     ["JS SDK v6", "Checkout button, Family Pay, tips", "in browser"],
+    ["Razorpay · Orders + Checkout (manual capture)", "UPI / card / netbanking payments held in India", orders.filter((o) => o.rail === "razorpay").length],
+    ["Razorpay · Payments capture", "Delivery OTP captures the UPI / card hold", orders.filter((o) => o.rail === "razorpay" && o.paypal.captureId).length],
+    ["Razorpay Route · transfers", "Karigar, Saathi and tip splits", orders.reduce((s, o) => s + (o.razorpay?.transfers?.length ?? 0), 0)],
     ["Agent Toolkit", "Talk agent reads orders, invoices, refunds, transactions, disputes", "with keys"],
   ];
   return (

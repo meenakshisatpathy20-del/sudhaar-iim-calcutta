@@ -1,4 +1,4 @@
-import { aiEnabled, config, paypalEnabled, serviceProblems } from "@/lib/config";
+import { aiEnabled, config, paypalEnabled, razorpayEnabled, serviceProblems } from "@/lib/config";
 import { ok } from "@/lib/http";
 import { bolnaConfig, callbackEnabled } from "@/lib/bolna";
 
@@ -14,6 +14,8 @@ export function GET() {
       // Sandbox test-money login for judges, only when both values are set.
       demoBuyer: paypalEnabled() && config.paypal.demoBuyerEmail && config.paypal.demoBuyerPassword ? { email: config.paypal.demoBuyerEmail, password: config.paypal.demoBuyerPassword } : null,
     },
+    // India: UPI, credit/debit cards and netbanking through Razorpay (test mode). The key id is public by design.
+    razorpay: { mode: razorpayEnabled() ? "test" : "simulated", keyId: razorpayEnabled() ? config.razorpay.keyId : null, problem: serviceProblems.razorpay ?? null },
     ai: { mode: aiEnabled() ? "gemini" : "simulated", model: aiEnabled() ? config.ai.model : null, problem: serviceProblems.ai ?? null },
     currency: config.currency,
     // The Bolna phone line: the number to dial (if set) and whether "Call me" works.

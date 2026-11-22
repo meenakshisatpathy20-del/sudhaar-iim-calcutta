@@ -134,7 +134,7 @@ export async function notifyOrder(orderId: string, event: SmsEvent, extra: { cla
         if (o.mode === "pickup")
           send(cust, hi ? `भुगतान होल्ड हुआ। साथी ${slot} आएगा। पिकअप OTP ${otp} सिर्फ़ साथी को सामान देते समय बताएं। ट्रैक: ${trackLink(o)}` : `Payment held. Your Repair Saathi comes ${slot}. Pickup OTP ${otp}: tell it only at handover. Track: ${trackLink(o)}`, otp);
         else send(cust, hi ? `भुगतान होल्ड हुआ। कारीगर ${slot} आएंगे। आने पर OTP ${otp} बताएं।` : `Payment held. The karigar visits ${slot}. Arrival OTP ${otp}: tell it when they arrive.`, otp);
-        if (payer && payer !== cust) send(payer, hi ? `धन्यवाद! ${who} की ${item} मरम्मत का भुगतान PayPal में होल्ड है। ट्रैक: ${trackLink(o)}` : `Thank you! Payment for ${who}'s ${item} repair is held by PayPal. Track: ${trackLink(o)}`);
+        if (payer && payer !== cust) send(payer, hi ? `धन्यवाद! ${who} की ${item} मरम्मत का भुगतान ${o.rail === "razorpay" ? "Razorpay" : "PayPal"} में होल्ड है। ट्रैक: ${trackLink(o)}` : `Thank you! Payment for ${who}'s ${item} repair is held by ${o.rail === "razorpay" ? "Razorpay" : "PayPal"}. Track: ${trackLink(o)}`);
         // The karigar and the Saathi often don't watch an app either: they get the job by SMS.
         const db = readDB();
         const k = db.accounts.find((a) => a.role === "karigar" && a.karigarId === o.karigarId);

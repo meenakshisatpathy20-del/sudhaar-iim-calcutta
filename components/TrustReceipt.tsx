@@ -40,7 +40,7 @@ const T: Record<string, L8> = {
   estimateRecorded: { en: "Estimate recorded with the booking", hi: "अनुमान बुकिंग के साथ दर्ज", bn: "বুকিংয়ের সাথে অনুমান সংরক্ষিত", mr: "बुकिंगसोबत अंदाज नोंदवला", te: "బుకింగ్‌తో అంచనా నమోదైంది", ta: "முன்பதிவுடன் மதிப்பீடு பதிவு", or: "ବୁକିଂ ସହ ଆକଳନ ରେକର୍ଡ", kn: "ಬುಕಿಂಗ್ ಜೊತೆ ಅಂದಾಜು ದಾಖಲಾಗಿದೆ" },
   hold: { en: "Customer approved payment hold", hi: "ग्राहक ने भुगतान होल्ड मंज़ूर किया", bn: "গ্রাহক পেমেন্ট হোল্ড অনুমোদন করেছেন", mr: "ग्राहकाने पेमेंट होल्ड मंजूर केले", te: "కస్టమర్ పేమెంట్ హోల్డ్‌ను ఆమోదించారు", ta: "வாடிக்கையாளர் கட்டண நிறுத்தத்தை ஒப்புதல் அளித்தார்", or: "ଗ୍ରାହକ ପେମେଣ୍ଟ ହୋଲ୍ଡ ଅନୁମୋଦନ କଲେ", kn: "ಗ್ರಾಹಕರು ಪಾವತಿ ಹೋಲ್ಡ್ ಅನುಮೋದಿಸಿದರು" },
   holdDetail: { en: "{a} authorized (intent AUTHORIZE, not captured)", hi: "{a} अधिकृत (होल्ड, अभी काटा नहीं गया)", bn: "{a} অনুমোদিত (হোল্ড, এখনো কাটা হয়নি)", mr: "{a} अधिकृत (होल्ड, अजून कापले नाही)", te: "{a} అధికారం పొందింది (హోల్డ్, ఇంకా తీసుకోలేదు)", ta: "{a} அங்கீகரிக்கப்பட்டது (நிறுத்தம், இன்னும் எடுக்கவில்லை)", or: "{a} ଅନୁମୋଦିତ (ହୋଲ୍ଡ, ଏପର୍ଯ୍ୟନ୍ତ କଟାଯାଇନି)", kn: "{a} ಅಧಿಕೃತ (ಹೋಲ್ಡ್, ಇನ್ನೂ ಕಡಿತವಾಗಿಲ್ಲ)" },
-  waitingPP: { en: "Waiting for PayPal approval", hi: "PayPal मंज़ूरी का इंतज़ार", bn: "PayPal অনুমোদনের অপেক্ষা", mr: "PayPal मंजुरीची प्रतीक्षा", te: "PayPal ఆమోదం కోసం వేచి ఉంది", ta: "PayPal ஒப்புதலுக்காக காத்திருக்கிறது", or: "PayPal ଅନୁମୋଦନ ପାଇଁ ଅପେକ୍ଷା", kn: "PayPal ಅನುಮೋದನೆಗಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ" },
+  waitingPP: { en: "Waiting for payment approval", hi: "भुगतान मंज़ूरी का इंतज़ार", bn: "পেমেন্ট অনুমোদনের অপেক্ষা", mr: "पेमेंट मंजुरीची प्रतीक्षा", te: "చెల్లింపు ఆమోదం కోసం వేచి ఉంది", ta: "கட்டண ஒப்புதலுக்காக காத்திருக்கிறது", or: "ପେମେଣ୍ଟ ଅନୁମୋଦନ ପାଇଁ ଅପେକ୍ଷା", kn: "ಪಾವತಿ ಅನುಮೋದನೆಗಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ" },
   pickup: { en: "Pickup verified by OTP", hi: "पिकअप OTP से सत्यापित", bn: "পিকআপ OTP দিয়ে যাচাই", mr: "पिकअप OTP ने पडताळले", te: "పికప్ OTPతో ధృవీకరించబడింది", ta: "பிக்அப் OTP மூலம் சரிபார்க்கப்பட்டது", or: "ପିକଅପ OTP ଦ୍ୱାରା ଯାଞ୍ଚ", kn: "ಪಿಕಪ್ OTP ಮೂಲಕ ಪರಿಶೀಲಿಸಲಾಗಿದೆ" },
   arrival: { en: "Arrival verified by OTP", hi: "आगमन OTP से सत्यापित", bn: "আগমন OTP দিয়ে যাচাই", mr: "आगमन OTP ने पडताळले", te: "రాక OTPతో ధృవీకరించబడింది", ta: "வருகை OTP மூலம் சரிபார்க்கப்பட்டது", or: "ଆଗମନ OTP ଦ୍ୱାରା ଯାଞ୍ଚ", kn: "ಆಗಮನ OTP ಮೂಲಕ ಪರಿಶೀಲಿಸಲಾಗಿದೆ" },
   otpDetail: { en: "Customer-held code checked on the server; partners never see it", hi: "ग्राहक का कोड सर्वर पर जाँचा गया; पार्टनर इसे कभी नहीं देखते", bn: "গ্রাহকের কোড সার্ভারে যাচাই; পার্টনাররা কখনো দেখেন না", mr: "ग्राहकाचा कोड सर्व्हरवर तपासला; पार्टनर्स तो कधीच पाहत नाहीत", te: "కస్టమర్ కోడ్ సర్వర్‌లో తనిఖీ; భాగస్వాములు ఎప్పుడూ చూడరు", ta: "வாடிக்கையாளர் குறியீடு சர்வரில் சரிபார்க்கப்பட்டது; பங்குதாரர்கள் பார்க்க முடியாது", or: "ଗ୍ରାହକଙ୍କ କୋଡ ସର୍ଭରରେ ଯାଞ୍ଚ; ପାର୍ଟନର କେବେ ଦେଖନ୍ତି ନାହିଁ", kn: "ಗ್ರಾಹಕರ ಕೋಡ್ ಸರ್ವರ್‌ನಲ್ಲಿ ಪರಿಶೀಲನೆ; ಪಾಲುದಾರರು ಎಂದಿಗೂ ನೋಡುವುದಿಲ್ಲ" },
@@ -73,11 +73,12 @@ const time = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { 
 
 export function buildTrustSteps(o: Order, quote: Quote | null | undefined, lang: Lang = "en"): Step[] {
   const t = (k: string, v?: Record<string, string | number>) => lx(T[k], lang, v);
-  const sandbox = o.paypal.mode === "sandbox";
-  const pp = sandbox ? t("ppSandbox") : t("simulated");
+  const india = o.rail === "razorpay";
+  const sandbox = india ? o.razorpay?.mode === "test" : o.paypal.mode === "sandbox";
+  const pp = india ? (sandbox ? `Razorpay test · ${o.razorpay?.methodLabel ?? "UPI"}` : `Razorpay simulated · ${o.razorpay?.methodLabel ?? "UPI"}`) : sandbox ? t("ppSandbox") : t("simulated");
   const check = o.completionCheck;
   const reviewSource = check?.source === "gemini" ? t("realGemini") : check?.source === "admin" ? t("human") : check ? t("aiUnavailable") : undefined;
-  const payoutsOk = o.payouts.length > 0 && o.payouts.every((p) => /SUCCESS|COMPLETED/i.test(p.status));
+  const payoutsOk = o.payouts.length > 0 && o.payouts.every((p) => /SUCCESS|COMPLETED|PROCESSED|SETTLED/i.test(p.status));
   const payoutsFailed = o.payouts.some((p) => /FAIL|DENIED|RETURNED|BLOCKED/i.test(p.status));
   const refunded = o.paypal.refunds.reduce((s, r) => s + r.amount, 0);
 
@@ -92,7 +93,7 @@ export function buildTrustSteps(o: Order, quote: Quote | null | undefined, lang:
     {
       label: t("hold"),
       state: o.paypal.authorizationId ? "done" : o.status === "cancelled" ? "warn" : "todo",
-      detail: o.paypal.authorizationId ? t("holdDetail", { a: money(o.paypal.heldAmount ?? o.total) }) : t("waitingPP"),
+      detail: o.paypal.authorizationId ? t("holdDetail", { a: india ? `₹${(o.razorpay?.heldPaise ?? 0) / 100}` : money(o.paypal.heldAmount ?? o.total) }) : t("waitingPP"),
       ref: o.paypal.authorizationId,
       source: pp,
     },
@@ -118,7 +119,7 @@ export function buildTrustSteps(o: Order, quote: Quote | null | undefined, lang:
     {
       label: t("captured"),
       state: o.paypal.captureId ? "done" : reached(o, "delivered") ? "pending" : "todo",
-      detail: o.paypal.captureId ? t("capturedDetail", { a: money(o.paypal.capturedAmount ?? o.total) }) + (refunded ? t("refundedPart", { a: money(refunded) }) : "") : t("notCaptured"),
+      detail: o.paypal.captureId ? t("capturedDetail", { a: india ? `₹${(o.razorpay?.capturedPaise ?? 0) / 100}` : money(o.paypal.capturedAmount ?? o.total) }) + (refunded ? t("refundedPart", { a: money(refunded) }) : "") : t("notCaptured"),
       ref: o.paypal.captureId,
       source: o.paypal.captureId ? pp : undefined,
     },
@@ -129,7 +130,7 @@ export function buildTrustSteps(o: Order, quote: Quote | null | undefined, lang:
         ? o.payouts.map((p) => `${p.label ?? (p.to === "karigar" ? t("karigar") : t("saathi"))} ${money(p.amount)}: ${p.status}`).join(" · ")
         : t("payoutsPending"),
       ref: o.paypal.payoutBatchId,
-      source: o.paypal.payoutBatchId ? (!sandbox ? t("simulated") : payoutsOk ? t("ppConfirmed") : t("batchSubmitted")) : undefined,
+      source: o.paypal.payoutBatchId ? (india ? (sandbox ? "Razorpay Route" : "Razorpay Route (simulated)") : !sandbox ? t("simulated") : payoutsOk ? t("ppConfirmed") : t("batchSubmitted")) : undefined,
     },
   ];
 }

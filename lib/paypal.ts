@@ -204,6 +204,17 @@ export async function captureAuthorization(authorizationId: string, amount: numb
   return { captureId: res.id, status: res.status };
 }
 
+/** Renews a hold after PayPal's 3-day honor period (allowed once, within the 29-day authorization). */
+export async function reauthorizeAuthorization(authorizationId: string, amount: number): Promise<{ authorizationId: string; status: string }> {
+  if (!paypalEnabled() || authorizationId.startsWith("SIM-")) return { authorizationId: sim("AUTH"), status: "CREATED" };
+  const res = await pp<{ id: string; status: string }>(`/v2/payments/authorizations/${authorizationId}/reauthorize`, {
+    method: "POST",
+    body: { amount: money(amount) },
+    requestId: `reauth-${authorizationId}`,
+  });
+  return { authorizationId: res.id, status: res.status };
+}
+
 export async function voidAuthorization(authorizationId: string): Promise<void> {
   if (!paypalEnabled()) return;
   await pp(`/v2/payments/authorizations/${authorizationId}/void`, { method: "POST", requestId: `void-${authorizationId}` });

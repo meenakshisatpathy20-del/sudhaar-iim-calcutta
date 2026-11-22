@@ -1,6 +1,6 @@
 import { callbackEnabled, placeCall } from "./bolna";
 import { readDB, updateDB } from "./db";
-import { expireUnpaidOrders } from "./orders";
+import { expireUnpaidOrders, renewOldHolds, retrySettlements } from "./orders";
 import { INR_PER_USD } from "./pricing";
 import { notifyOrder } from "./sms";
 import { slotLabel } from "./slots";
@@ -82,6 +82,9 @@ export async function tick(now = Date.now()) {
   try {
     // 1. Expired unpaid bookings are cancelled, and the customer and payer told (inside expireUnpaidOrders).
     for (const id of await expireUnpaidOrders()) done.push(`${id}: expired, customer told`);
+    // Money safety nets: finish settlements that failed at delivery, and renew PayPal holds on long repairs.
+    for (const id of await retrySettlements()) done.push(`${id}: settlement completed on retry`);
+    for (const id of await renewOldHolds()) done.push(`${id}: PayPal hold renewed`);
 
     const t = timings();
     for (const o of readDB().orders) {

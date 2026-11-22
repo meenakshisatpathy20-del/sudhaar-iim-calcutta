@@ -25,6 +25,20 @@ export const config = {
     demoBuyerEmail: env("PAYPAL_DEMO_BUYER_EMAIL"),
     demoBuyerPassword: env("PAYPAL_DEMO_BUYER_PASSWORD"),
   },
+  // Razorpay (India): UPI (GPay, PhonePe, Paytm…), credit and debit cards, netbanking, in rupees.
+  // Test keys only (rzp_test_…), the same rule as the PayPal sandbox. Empty = labelled simulation.
+  razorpay: {
+    keyId: env("RAZORPAY_KEY_ID"),
+    keySecret: env("RAZORPAY_KEY_SECRET"),
+    webhookSecret: env("RAZORPAY_WEBHOOK_SECRET"),
+    apiBase: env("RAZORPAY_API_BASE") || "https://api.razorpay.com/v1",
+    // Razorpay Route linked accounts (acc_…) that receive the karigar's and the Saathi's share.
+    // Without them the split is recorded as a simulated transfer.
+    karigarAccount: env("RAZORPAY_KARIGAR_ACCOUNT"),
+    saathiAccount: env("RAZORPAY_SAATHI_ACCOUNT"),
+    // How long Razorpay keeps an uncaptured (held) payment before releasing it, in minutes.
+    holdMinutes: num(process.env.RAZORPAY_HOLD_MINUTES, 7200),
+  },
   ai: {
     // Google Gemini (aistudio.google.com). "gemini-flash-latest" follows Google's current Flash model.
     apiKey: env("GEMINI_API_KEY"),
@@ -45,7 +59,7 @@ export const config = {
  * labelled simulation instead of failing every request, and the admin System check says why.
  * Kept on globalThis because Next.js can load this module more than once in one server.
  */
-type Problems = { paypal?: string; ai?: string };
+type Problems = { paypal?: string; ai?: string; razorpay?: string };
 const g = globalThis as typeof globalThis & { __sudhaarProblems?: Problems };
 export const serviceProblems: Problems = (g.__sudhaarProblems ??= {});
 
@@ -53,3 +67,6 @@ export const paypalConfigured = () => Boolean(config.paypal.clientId && config.p
 export const aiConfigured = () => Boolean(config.ai.apiKey);
 export const paypalEnabled = () => paypalConfigured() && !serviceProblems.paypal;
 export const aiEnabled = () => aiConfigured() && !serviceProblems.ai;
+/** Live Razorpay keys are refused: Sudhaar only takes test money, like the PayPal sandbox. */
+export const razorpayConfigured = () => Boolean(config.razorpay.keyId.startsWith("rzp_test_") && config.razorpay.keySecret);
+export const razorpayEnabled = () => razorpayConfigured() && !serviceProblems.razorpay;

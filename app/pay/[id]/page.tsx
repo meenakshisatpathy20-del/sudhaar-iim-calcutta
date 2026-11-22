@@ -11,6 +11,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { Timeline } from "@/components/Timeline";
 import { orderRupees, rupees, rupeeTotal, UsdNote } from "@/components/Inr";
 import { PayPalCheckout } from "@/components/PayPalCheckout";
+import { PaymentChooser, RazorpayCheckout } from "@/components/RazorpayCheckout";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Karigar, Order } from "@/lib/types";
@@ -110,7 +111,7 @@ export default function FamilyPayPage({ params, searchParams }: { params: Promis
               {t("fpExpired", { name: order.customer.name.split(" ")[0] })}
             </p>
           )}
-          {!paid && !expired && order.paypal.orderId && <PayPalCheckout orderId={order.id} paypalOrderId={order.paypal.orderId} total={order.total} inrLabel={orderRupees(order)} onApproved={load} token={token} />}
+          {!paid && !expired && <PaymentChooser order={order} onApproved={load} token={token} defaultTab="abroad" />}
           {paid && order.priceChange && ["pending", "awaiting_payment"].includes(order.priceChange.status) && <PriceChangeCard order={order} token={token} onDone={load} />}
           {paid && (
             <div className="space-y-2 rounded-2xl bg-teal/10 p-4 text-center">
@@ -170,10 +171,14 @@ function PriceChangeCard({ order, token, onDone }: { order: Order; token: string
           </button>
         </div>
       )}
-      {pc.status === "awaiting_payment" && pc.topUp?.paypalOrderId && (
+      {pc.status === "awaiting_payment" && pc.topUp && (order.rail === "razorpay" || pc.topUp.paypalOrderId) && (
         <>
           <p className="text-xs font-semibold">{t("pcPayExtra", vars)}</p>
-          <PayPalCheckout orderId={order.id} paypalOrderId={pc.topUp.paypalOrderId} total={pc.topUp.amount} inrLabel={rupees(pc.topUp.amount)} onApproved={onDone} token={token} topUp />
+          {order.rail === "razorpay" ? (
+            <RazorpayCheckout orderId={order.id} purpose="topup" inrLabel={rupees(pc.topUp.amount)} onApproved={onDone} token={token} />
+          ) : (
+            <PayPalCheckout orderId={order.id} paypalOrderId={pc.topUp.paypalOrderId!} total={pc.topUp.amount} inrLabel={rupees(pc.topUp.amount)} onApproved={onDone} token={token} topUp />
+          )}
         </>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}

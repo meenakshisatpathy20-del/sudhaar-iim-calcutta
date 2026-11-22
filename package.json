@@ -1,5 +1,5 @@
 {
-  "name": "sudhaar-paypal",
+  "name": "sudhaar",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "lint": "eslint",
     "smoke:paypal": "node --env-file=.env scripts/paypal-smoke.mjs",
     "test:flow": "node scripts/lifecycle-test.mjs",
+    "test:india": "node scripts/razorpay-test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -57,6 +58,6 @@
   "engines": {
     "node": ">=20"
   },
-  "description": "Sudhaar - doorstep repair marketplace on PayPal + AI (PayPal AI Hackathon 2026)",
+  "description": "Sudhaar - doorstep repair marketplace for local karigars, with UPI / cards (Razorpay), PayPal and AI",
   "license": "MIT"
 }

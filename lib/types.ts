@@ -211,7 +211,7 @@ export interface PriceChange {
   requestedAt: string;
   decidedAt?: string;
   /** A price increase is held as a second PayPal authorization for just the difference. */
-  topUp?: { amount: number; paypalOrderId?: string; authorizationId?: string; captureId?: string };
+  topUp?: { amount: number; paypalOrderId?: string; authorizationId?: string; captureId?: string; razorpayOrderId?: string; razorpayPaymentId?: string; amountPaise?: number };
 }
 
 export interface PayoutLine {
@@ -348,6 +348,10 @@ export interface Tip {
   paypalOrderId?: string;
   captureId?: string;
   payoutBatchId?: string;
+  /** Tips on a UPI / card (Razorpay) order are paid the same way and sent by Route transfer. */
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  amountPaise?: number;
   createdAt: string;
   paidAt?: string;
 }
@@ -399,6 +403,20 @@ export interface Order {
   split: { karigar: number; saathi: number; platform: number; donation: number };
   pickupOtp: string;
   deliveryOtp: string;
+  /**
+   * Which gateway holds the money: "paypal" (default; cross-border and Family Pay from abroad) or
+   * "razorpay" (inside India: UPI, credit/debit cards, netbanking, in rupees).
+   * For Razorpay orders the hold/capture/refund ids below are Razorpay's (pay_…, rfnd_…), so every
+   * check that asks "is the money held / captured / refunded?" works the same for both rails.
+   */
+  rail?: "paypal" | "razorpay";
+  razorpay?: RazorpayInfo;
+  /** Wrong OTP tries per handover; after too many the step locks until the team checks it. */
+  otpFails?: { pickup?: number; delivery?: number; lockedUntil?: string };
+  /** When the PayPal hold was last renewed (reauthorized) during a long repair. */
+  reauthorizedAt?: string;
+  /** Background retries of a capture / payout / invoice that failed at delivery. */
+  settleRetries?: number;
   paypal: {
     mode: "sandbox" | "simulated";
     orderId?: string;
@@ -435,12 +453,27 @@ export interface Order {
   nudges?: { payReminders?: number; payCall?: boolean; expiredNotice?: boolean; pickupSoon?: boolean };
 }
 
+/** A payment taken in India through Razorpay (amounts in paise: ₹1 = 100 paise). */
+export interface RazorpayInfo {
+  mode: "test" | "simulated";
+  orderId?: string;
+  /** What the Razorpay order asks for, in paise (the rupee bill the customer saw). */
+  orderPaise?: number;
+  paymentId?: string;
+  method?: string;
+  /** e.g. "UPI · @okaxis", "Visa credit card ••4242" (never a full card number or UPI id). */
+  methodLabel?: string;
+  heldPaise?: number;
+  capturedPaise?: number;
+  transfers?: { to: "karigar" | "saathi"; label: string; id: string; amountPaise: number; status: string }[];
+}
+
 export interface DB {
   karigars: Karigar[];
   saathis: Saathi[];
   quotes: Quote[];
   orders: Order[];
-  webhooks: { at: string; type: string; resource?: string; verified: boolean; eventId?: string; duplicate?: boolean }[];
+  webhooks: { at: string; type: string; resource?: string; verified: boolean; eventId?: string; duplicate?: boolean; provider?: "paypal" | "razorpay" }[];
   applications: KarigarApplication[];
   accounts: Account[];
   /** Karigar and Saathi ids that switched themselves offline (no new jobs). */

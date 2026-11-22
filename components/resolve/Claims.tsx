@@ -272,7 +272,7 @@ export function ClaimForm({ order, onCancel }: { order: Order; onCancel?: () => 
               <Receipt className="size-3.5 text-primary" /> {t("oBillAttached")}
             </p>
             <p className="text-muted-foreground">
-              Invoice <span className="font-mono">{order.paypal.invoiceId ?? "pending"}</span> · capture <span className="font-mono">{order.paypal.captureId}</span> · {t("oPaid")} {money(order.total)}
+              Invoice <span className="font-mono">{order.paypal.invoiceId ?? (order.rail === "razorpay" ? "Razorpay receipt" : "pending")}</span> · capture <span className="font-mono">{order.paypal.captureId}</span> · {t("oPaid")} {money(order.total)}
               {refunded > 0 && ` · ${t("oRefunded")} ${money(refunded)}`}
             </p>
           </div>

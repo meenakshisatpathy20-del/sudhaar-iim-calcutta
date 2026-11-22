@@ -213,7 +213,7 @@ function Parties({ order: o, claim: c, me, warrantyLeft }: { order: Order; claim
     [t("rhPaid"), money(o.total)],
     ...(refunded > 0 ? ([[t("oRefunded"), money(refunded)]] as [string, React.ReactNode][]) : []),
     [t("rhWarranty"), warrantyLeft >= 0 ? t("rhDaysLeft", { n: warrantyLeft }) : t("rhWarrantyOver")],
-    ["Invoice", <span key="i" className="font-mono">{o.paypal.invoiceId ?? "—"}</span>],
+    ["Invoice", <span key="i" className="font-mono">{o.paypal.invoiceId ?? (o.rail === "razorpay" ? `Razorpay · ${o.razorpay?.methodLabel ?? "UPI"}` : "—")}</span>],
     ["Capture", <span key="c" className="font-mono">{o.paypal.captureId ?? "—"}</span>],
   ];
   return (

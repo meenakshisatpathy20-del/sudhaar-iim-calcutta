@@ -7,6 +7,7 @@ import { api } from "./api";
 import { rupees } from "./Inr";
 import { useLang } from "./LanguageProvider";
 import { PayPalCheckout } from "./PayPalCheckout";
+import { RazorpayCheckout } from "./RazorpayCheckout";
 import { Avatar } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -112,6 +113,7 @@ function KarigarThanks({ order, k, onChange }: { order: Order; k: DeliveredKarig
             </div>
             <p className="text-xs text-muted-foreground">{t("tipNote", { shop: k.shop })}</p>
             {pendingTip?.paypalOrderId && <PayPalCheckout orderId={order.id} paypalOrderId={pendingTip.paypalOrderId} total={pendingTip.amount} tipId={pendingTip.id} onApproved={onChange} />}
+            {pendingTip && order.rail === "razorpay" && <RazorpayCheckout key={pendingTip.id} orderId={order.id} purpose="tip" tipId={pendingTip.id} inrLabel={rupees(pendingTip.amount)} onApproved={onChange} />}
           </>
         )}
       </div>

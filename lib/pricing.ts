@@ -42,6 +42,14 @@ export const round2 = (n: number) => Math.round(n * 100) / 100;
 /** PayPal sandbox settles in USD; customers see rupees at this approximate rate. */
 export const INR_PER_USD = 85;
 
+/** Whole rupees for a USD amount, rounded the way every bill line is shown. */
+export const usdToInr = (usd: number) => Math.round(usd * INR_PER_USD);
+/** Razorpay works in paise (₹1 = 100 paise). */
+export const usdToPaise = (usd: number) => usdToInr(usd) * 100;
+/** The rupee bill in paise: each line rounded to rupees first, exactly as the bill shows it (components/Inr orderRupees). */
+export const orderPaise = (o: { jobs?: { price: number }[]; repairCharge: number; pickupFee: number; donation: number; discount?: { care?: number; coupon?: { amount: number } } }) =>
+  [...(o.jobs?.length ? o.jobs.map((j) => j.price) : [o.repairCharge]), o.pickupFee, o.donation, -(o.discount?.care ?? 0), -(o.discount?.coupon?.amount ?? 0)].reduce((s, u) => s + usdToInr(u), 0) * 100;
+
 /**
  * Who gets what. A discount (coupon or Sudhaar Care) lowers what the customer pays and comes out of
  * Sudhaar's share: the karigar and the Saathi are always paid on the full price.

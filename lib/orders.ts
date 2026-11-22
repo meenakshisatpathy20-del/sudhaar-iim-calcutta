@@ -7,6 +7,7 @@ import {
   authorizeOrder,
   captureAuthorization,
   captureOrder,
+  reauthorizeAuthorization,
   createAuthorizeOrder,
   createPaidInvoice,
   createTipOrder,
@@ -19,7 +20,8 @@ import {
 } from "./paypal";
 import { careActive } from "./care";
 import { couponDiscount } from "./coupons";
-import { AVG_ITEM_KG, basketPickupFee, computeSplit, haversineKm, INR_PER_USD, karigarPrice, pickupFee, platformShare, round2, serviceModeFor } from "./pricing";
+import { AVG_ITEM_KG, basketPickupFee, computeSplit, haversineKm, INR_PER_USD, karigarPrice, orderPaise, pickupFee, platformShare, round2, serviceModeFor, usdToPaise } from "./pricing";
+import { capturePayment, checkoutSignatureValid, createRazorpayOrder, describeRazorpayError, fetchPayment, razorpayMode, refundPayment, transferSplit } from "./razorpay";
 import { canRate, liveStats, orderKarigars } from "./reviews";
 import { acceptSlot, pickupSlots } from "./slots";
 import { warrantyDays, warrantyDaysLeft } from "./warranty";
@@ -386,55 +388,208 @@ export async function expireUnpaidOrders(): Promise<string[]> {
   });
 }
 
+/**
+ * A coupon is checked when it's applied and at booking, but two unpaid bookings could carry the same
+ * one-time code. Check again at the moment of payment, before any money is held.
+ */
+function assertCouponStillValid(db: DB, o: Order) {
+  const code = o.discount?.coupon?.code;
+  if (!code) return;
+  const c = db.coupons?.find((x) => x.code === code);
+  if (c?.maxUses !== undefined && c.uses >= c.maxUses) throw new FlowError(`Coupon ${code} has been fully used since you booked. Please book again without it; nothing was charged.`, 409);
+  const usedElsewhere = db.orders.some((x) => x.id !== o.id && x.customerId === o.customerId && x.discount?.coupon?.code === code && x.status !== "awaiting_payment" && x.status !== "cancelled");
+  if (usedElsewhere) throw new FlowError(`You've already used ${code} on another repair. Please book again without it; nothing was charged.`, 409);
+}
+
+/** Bookkeeping once the money is held, the same for PayPal and Razorpay. */
+function markHeld(db: DB, o: Order, held: { ref: string; gateway: string; payerEmail?: string; amountText: string }) {
+  // Paid after the chosen pickup window had already started (e.g. the family paid the next day):
+  // move to the next free window instead of sending a Saathi to a time that has passed.
+  if (o.pickupSlot && !acceptSlot(o.pickupSlot)) {
+    const next = pickupSlots()[0];
+    log(o, { actor: "system", message: `The chosen pickup time had passed when the payment came in, so pickup moved to the next free window.` });
+    o.pickupSlot = next;
+  }
+  const code = o.discount?.coupon?.code;
+  if (code) {
+    const c = db.coupons?.find((x) => x.code === code);
+    if (c) c.uses += 1;
+  }
+  if (o.familyPay) {
+    o.familyPay.paidBy = held.payerEmail ?? o.familyPay.email ?? o.familyPay.name;
+    o.familyPay.paidAt = now();
+    log(o, { actor: "customer", message: `${o.familyPay.name} (${o.familyPay.relation}) approved the payment with ${held.gateway} from their own account.` });
+  } else if (held.payerEmail) o.customer.email = held.payerEmail;
+  log(o, {
+    status: "authorized",
+    actor: "system",
+    kind: "paypal",
+    message: `Payment of ${held.amountText} authorized and held by ${held.gateway}. It is captured only after the delivery OTP.`,
+    ref: held.ref,
+  });
+  log(o, {
+    actor: "system",
+    message:
+      o.mode === "pickup"
+        ? "Repair Saathi assigned. Your pickup OTP is on your order page; share it only at pickup."
+        : "Karigar will visit. Your arrival OTP is on your order page; share it only when they arrive.",
+  });
+}
+
 export async function approveOrder(orderId: string, paypalOrderId: string): Promise<Order> {
   const was = getOrder(orderId)?.status;
-  const order = await mutate(orderId, async (o) => {
+  const order = await updateDB(async (db) => {
+    const o = db.orders.find((x) => x.id === orderId);
+    if (!o) throw new FlowError("Order not found", 404);
     if (o.status === "cancelled") throw new FlowError("This booking has expired or was cancelled. Please book again; nothing was charged.", 409);
-    if (o.status !== "awaiting_payment") return; // idempotent
+    if (o.status !== "awaiting_payment") return o; // idempotent
     if (o.paypal.orderId !== paypalOrderId) throw new FlowError("PayPal order id does not match this booking");
+    assertCouponStillValid(db, o);
     try {
       const auth = await authorizeOrder(paypalOrderId);
+      o.rail = "paypal";
       o.paypal.authorizationId = auth.authorizationId;
       o.paypal.heldAmount = o.total;
-      // Paid after the chosen pickup window had already started (e.g. the family paid the next day):
-      // move to the next free window instead of sending a Saathi to a time that has passed.
-      if (o.pickupSlot && !acceptSlot(o.pickupSlot)) {
-        const next = pickupSlots()[0];
-        log(o, { actor: "system", message: `The chosen pickup time had passed when the payment came in, so pickup moved to the next free window.` });
-        o.pickupSlot = next;
-      }
-      const code = o.discount?.coupon?.code;
-      if (code) {
-        const c = readDB().coupons?.find((x) => x.code === code);
-        if (c) c.uses += 1;
-      }
-      if (o.familyPay) {
-        o.familyPay.paidBy = auth.payerEmail ?? o.familyPay.email ?? o.familyPay.name;
-        o.familyPay.paidAt = now();
-        log(o, { actor: "customer", message: `${o.familyPay.name} (${o.familyPay.relation}) approved the payment with PayPal from their own account.` });
-      } else if (auth.payerEmail) o.customer.email = auth.payerEmail;
-      log(o, {
-        status: "authorized",
-        actor: "system",
-        kind: "paypal",
-        message: `Payment of $${o.total.toFixed(2)} authorized and held by PayPal. It is captured only after the delivery OTP.`,
-        ref: auth.authorizationId,
-      });
-      log(o, {
-        actor: "system",
-        message:
-          o.mode === "pickup"
-            ? "Repair Saathi assigned. Your pickup OTP is on your order page; share it only at pickup."
-            : "Karigar will visit. Your arrival OTP is on your order page; share it only when they arrive.",
-      });
+      markHeld(db, o, { ref: auth.authorizationId, gateway: "PayPal", payerEmail: auth.payerEmail, amountText: `$${o.total.toFixed(2)}` });
     } catch (e) {
       const d = describePayPalError(e);
       log(o, { actor: "system", kind: "error", message: `Authorization failed: ${d.message}`, ref: d.ref });
       throw new FlowError(`PayPal authorization failed: ${d.message}`, 502);
     }
+    return o;
   });
   // The pickup (or arrival) OTP goes to the customer's registered number, so nobody has to log in.
   if (was === "awaiting_payment" && order.status === "authorized") await notifyOrder(orderId, "paid");
+  return order;
+}
+
+// ---------- India: UPI, credit/debit cards and netbanking through Razorpay ----------
+
+export type RazorpayPurpose = "booking" | "topup" | "tip";
+
+/**
+ * Creates (or reuses) the Razorpay order the checkout opens. Bookings and price top-ups use manual
+ * capture, so a successful UPI or card payment is only held until the delivery OTP, like PayPal.
+ * A tip is captured at once.
+ */
+export async function startRazorpay(orderId: string, purpose: RazorpayPurpose, tipId?: string): Promise<{ razorpayOrderId: string; amountPaise: number; description: string }> {
+  let out: { razorpayOrderId: string; amountPaise: number; description: string } | undefined;
+  await mutate(orderId, async (o) => {
+    if (purpose === "booking") {
+      if (o.status === "cancelled") throw new FlowError("This booking has expired or was cancelled. Please book again; nothing was charged.", 409);
+      if (o.status !== "awaiting_payment") throw new FlowError("This booking is already paid", 409);
+      const amountPaise = orderPaise(o);
+      // Reuse the Razorpay order unless the bill changed since it was made.
+      if (!o.razorpay?.orderId || o.razorpay.orderPaise !== amountPaise || o.razorpay.mode !== razorpayMode()) {
+        const r = await createRazorpayOrder({ amountPaise, receipt: o.id, notes: { sudhaar_order: o.id, purpose }, capture: "manual" });
+        o.razorpay = { mode: razorpayMode(), orderId: r.id, orderPaise: amountPaise };
+        log(o, { actor: "system", kind: "paypal", message: `Razorpay order created for ₹${amountPaise / 100} (UPI, cards or netbanking; manual capture, so the money is held, not taken).`, ref: r.id });
+      }
+      out = { razorpayOrderId: o.razorpay.orderId!, amountPaise, description: `Repair ${o.id}: ${o.item}` };
+      return;
+    }
+    if (o.rail !== "razorpay") throw new FlowError("This repair was paid with PayPal, so extra payments use PayPal too");
+    if (purpose === "topup") {
+      const pc = o.priceChange;
+      if (!pc || pc.status !== "awaiting_payment" || !pc.topUp) throw new FlowError("No extra payment is waiting");
+      pc.topUp.amountPaise ??= usdToPaise(pc.topUp.amount);
+      if (!pc.topUp.razorpayOrderId) {
+        const r = await createRazorpayOrder({ amountPaise: pc.topUp.amountPaise, receipt: `${o.id}-extra`, notes: { sudhaar_order: o.id, purpose }, capture: "manual" });
+        pc.topUp.razorpayOrderId = r.id;
+      }
+      out = { razorpayOrderId: pc.topUp.razorpayOrderId, amountPaise: pc.topUp.amountPaise, description: `Extra repair work: ${pc.item}` };
+      return;
+    }
+    const tip = o.tips?.find((t) => t.id === tipId);
+    if (!tip || tip.status !== "awaiting_payment") throw new FlowError("No tip is waiting for payment");
+    tip.amountPaise ??= usdToPaise(tip.amount);
+    if (!tip.razorpayOrderId) {
+      const r = await createRazorpayOrder({ amountPaise: tip.amountPaise, receipt: `${o.id}-${tip.id}`, notes: { sudhaar_order: o.id, purpose, tip: tip.id }, capture: "automatic" });
+      tip.razorpayOrderId = r.id;
+    }
+    out = { razorpayOrderId: tip.razorpayOrderId, amountPaise: tip.amountPaise, description: "Thank-you tip for your karigar" };
+  });
+  return out!;
+}
+
+/**
+ * Checkout succeeded. Never trust the browser alone: check Razorpay's signature, then ask Razorpay
+ * for the payment and make sure it belongs to this order, has the right amount and is really held.
+ * Also called from the Razorpay webhook, so a payment still counts if the customer closed the tab.
+ */
+export async function approveRazorpay(
+  orderId: string,
+  purpose: RazorpayPurpose,
+  input: { razorpayOrderId: string; paymentId: string; signature?: string; tipId?: string; simulatedMethod?: string; fromWebhook?: boolean },
+): Promise<Order> {
+  const was = getOrder(orderId)?.status;
+  if (!input.fromWebhook && !checkoutSignatureValid(input.razorpayOrderId, input.paymentId, input.signature ?? "")) throw new FlowError("Razorpay could not confirm this payment (signature check failed)", 400);
+  const order = await updateDB(async (db) => {
+    const o = db.orders.find((x) => x.id === orderId);
+    if (!o) throw new FlowError("Order not found", 404);
+    const tip = purpose === "tip" ? o.tips?.find((t) => t.id === input.tipId) : undefined;
+    const pc = o.priceChange;
+    const expected =
+      purpose === "booking"
+        ? { orderId: o.razorpay?.orderId, paise: o.razorpay?.orderPaise }
+        : purpose === "topup"
+          ? { orderId: pc?.topUp?.razorpayOrderId, paise: pc?.topUp?.amountPaise }
+          : { orderId: tip?.razorpayOrderId, paise: tip?.amountPaise };
+    if (!expected.orderId || expected.orderId !== input.razorpayOrderId) throw new FlowError("Razorpay order id does not match this booking");
+    // Idempotent: the browser and the webhook may both report the same payment.
+    if (purpose === "booking" && o.status !== "awaiting_payment") {
+      if (o.razorpay?.paymentId === input.paymentId) return o;
+      if (o.status === "cancelled") throw new FlowError("This booking has expired or was cancelled. Razorpay releases the held amount automatically.", 409);
+      return o;
+    }
+    if (purpose === "topup" && pc?.status !== "awaiting_payment") return o;
+    if (purpose === "tip" && tip?.status !== "awaiting_payment") return o;
+    if (purpose === "booking") assertCouponStillValid(db, o);
+
+    let p: Awaited<ReturnType<typeof fetchPayment>>;
+    try {
+      p = await fetchPayment(input.paymentId, { amountPaise: expected.paise ?? 0, orderId: expected.orderId, method: input.simulatedMethod });
+    } catch (e) {
+      throw new FlowError(`Razorpay could not confirm the payment: ${describeRazorpayError(e).message}`, 502);
+    }
+    if (p.orderId !== expected.orderId) throw new FlowError("This payment belongs to a different Razorpay order");
+    if (p.amountPaise !== expected.paise) throw new FlowError("The amount paid does not match the bill");
+    const wanted = purpose === "tip" ? ["authorized", "captured"] : ["authorized"];
+    if (!wanted.includes(p.status)) throw new FlowError(`Razorpay reports this payment as ${p.status}`);
+
+    if (purpose === "booking") {
+      o.rail = "razorpay";
+      o.razorpay = { ...o.razorpay!, paymentId: p.id, method: p.method, methodLabel: p.label, heldPaise: p.amountPaise };
+      // The shared hold/capture fields carry Razorpay's payment id for this rail (see Order.rail).
+      o.paypal.authorizationId = p.id;
+      o.paypal.heldAmount = o.total;
+      markHeld(db, o, { ref: p.id, gateway: `Razorpay (${p.label})`, amountText: `₹${(p.amountPaise / 100).toLocaleString("en-IN")}` });
+    } else if (purpose === "topup") {
+      pc!.topUp!.razorpayPaymentId = p.id;
+      pc!.topUp!.authorizationId = p.id;
+      applyPrice(o, pc!);
+      log(o, { actor: "customer", kind: "paypal", message: `Extra ₹${p.amountPaise / 100} held by Razorpay (${p.label}). New repair price: $${pc!.to.toFixed(2)}.`, ref: p.id });
+    } else {
+      const k = db.karigars.find((x) => x.id === tip!.karigarId)!;
+      if (p.status === "authorized") await capturePayment(p.id, p.amountPaise);
+      tip!.razorpayPaymentId = p.id;
+      tip!.captureId = p.id;
+      tip!.status = "paid";
+      tip!.paidAt = now();
+      log(o, { actor: "customer", kind: "paypal", message: `Thank-you tip of ₹${p.amountPaise / 100} for ${k.shop} paid with ${p.label}.`, ref: p.id });
+      // Sudhaar keeps nothing from a tip: all of it goes to the karigar by Route transfer.
+      try {
+        const [t] = await transferSplit(p.id, [{ to: "karigar", account: config.razorpay.karigarAccount, amountPaise: p.amountPaise, note: `Tip from your Sudhaar customer (${o.id})` }], `${o.id}-${tip!.id}`);
+        tip!.payoutBatchId = t.id;
+        o.payouts.push({ to: "karigar", kind: "tip", partnerId: k.id, label: k.shop, receiver: "Razorpay Route", amount: tip!.amount, status: t.status });
+        log(o, { actor: "system", kind: "paypal", message: `Tip sent in full to ${k.shop} by Razorpay Route transfer.`, ref: t.id });
+      } catch (e) {
+        log(o, { actor: "system", kind: "error", message: `Tip transfer failed, the support team will retry: ${describeRazorpayError(e).message}` });
+      }
+    }
+    return o;
+  });
+  if (purpose === "booking" && was === "awaiting_payment" && order.status === "authorized") await notifyOrder(orderId, "paid");
   return order;
 }
 
@@ -452,8 +607,13 @@ const NEXT: Record<Action, { from: OrderStatus[]; to: OrderStatus; actor: OrderE
   cancel: { from: ["awaiting_payment", "authorized"], to: "cancelled", actor: "customer" },
 };
 
+/** Wrong OTP tries allowed before the code is replaced and the handover pauses. */
+const OTP_TRIES = 5;
+const OTP_COOLDOWN_MS = 15 * 60 * 1000;
+
 export async function advance(orderId: string, action: Action, opts: { otp?: string; afterPhoto?: string; beforePhoto?: string; jobId?: string } = {}): Promise<Order> {
   const was = getOrder(orderId)?.status;
+  let otpProblem: { message: string; resend?: boolean } | undefined;
   const order = await mutate(orderId, async (o) => {
     if (o.kind === "basket" && (action === "start_repair" || action === "mark_repaired")) {
       await advanceJob(o, action, opts);
@@ -467,8 +627,31 @@ export async function advance(orderId: string, action: Action, opts: { otp?: str
     if (action === "out_for_delivery" && o.mode !== "pickup") throw new FlowError("Home visits have no delivery leg");
 
     const needsPickupOtp = action === "pickup" || (action === "start_repair" && o.mode === "home-visit");
-    if (needsPickupOtp && opts.otp?.trim() !== o.pickupOtp) throw new FlowError("Wrong OTP. Ask the customer for the pickup/arrival OTP shown in their app.");
-    if (action === "deliver" && opts.otp?.trim() !== o.deliveryOtp) throw new FlowError("Wrong OTP. Ask the customer for the delivery OTP shown in their app.");
+    // A 4-digit code could be guessed by trying them all. After a few wrong tries the code is replaced
+    // (the customer gets the new one) and the handover pauses, so guessing never gets anywhere.
+    const which = needsPickupOtp ? "pickup" : action === "deliver" ? "delivery" : undefined;
+    if (which) {
+      const fails = (o.otpFails ??= {});
+      if (fails.lockedUntil && Date.parse(fails.lockedUntil) > Date.now()) {
+        const mins = Math.ceil((Date.parse(fails.lockedUntil) - Date.now()) / 60_000);
+        throw new FlowError(`Too many wrong OTPs. This handover is paused for ${mins} min and the customer has a new code.`, 429);
+      }
+      const right = which === "pickup" ? o.pickupOtp : o.deliveryOtp;
+      if (opts.otp?.trim() !== right) {
+        fails[which] = (fails[which] ?? 0) + 1;
+        if (fails[which]! % OTP_TRIES === 0) {
+          if (which === "pickup") o.pickupOtp = otp();
+          else o.deliveryOtp = otp();
+          fails.lockedUntil = new Date(Date.now() + OTP_COOLDOWN_MS).toISOString();
+          log(o, { actor: "system", kind: "error", message: `${OTP_TRIES} wrong ${which} OTPs in a row. The code was replaced and the handover is paused for 15 minutes. Sudhaar team: please check with the customer.` });
+          otpProblem = { message: "Too many wrong OTPs. The customer has been sent a new code; try again in 15 minutes.", resend: true };
+        } else {
+          otpProblem = { message: `Wrong OTP. Ask the customer for the ${which === "pickup" ? "pickup/arrival" : "delivery"} OTP shown in their app. ${OTP_TRIES - (fails[which]! % OTP_TRIES)} tries left.` };
+        }
+        return;
+      }
+      fails[which] = 0;
+    }
 
     // Phone bookings have no photo of the item, so whoever first handles it takes the "before" photo.
     // The AI repair check compares it with the karigar's after photo.
@@ -512,7 +695,10 @@ export async function advance(orderId: string, action: Action, opts: { otp?: str
       return;
     }
 
-    if (action === "cancel" && o.paypal.authorizationId && o.status === "authorized") {
+    if (action === "cancel" && o.rail === "razorpay" && o.paypal.authorizationId && o.status === "authorized") {
+      // Razorpay has no "void": a held (uncaptured) payment is released back to the customer automatically.
+      log(o, { actor: "system", kind: "paypal", message: "Held payment will not be captured. Razorpay releases the held amount back to the customer automatically. No money was taken.", ref: o.paypal.authorizationId });
+    } else if (action === "cancel" && o.paypal.authorizationId && o.status === "authorized") {
       try {
         await voidAuthorization(o.paypal.authorizationId);
         log(o, { actor: "system", kind: "paypal", message: "Held payment released (authorization voided). No money was taken.", ref: o.paypal.authorizationId });
@@ -524,6 +710,10 @@ export async function advance(orderId: string, action: Action, opts: { otp?: str
     log(o, { status: step.to, actor: o.mode === "home-visit" && step.actor === "saathi" ? "karigar" : step.actor, message: messages[action] });
   });
 
+  if (otpProblem) {
+    if (otpProblem.resend) await notifyOrder(orderId, "otp_resend");
+    throw new FlowError(otpProblem.message);
+  }
   if (action === "deliver") return settle(orderId);
   // The delivery OTP is texted when it's needed: the item is on its way back, or a home visit is done.
   const needsDeliveryOtp = order.status === "out_for_delivery" || (order.mode === "home-visit" && order.status === "repaired");
@@ -607,6 +797,7 @@ export async function settle(orderId: string): Promise<Order> {
 async function settleInner(orderId: string): Promise<Order> {
   return mutate(orderId, async (o) => {
     if (o.status !== "delivered" || !o.paypal.authorizationId) return;
+    if (o.rail === "razorpay") return settleRazorpay(o);
     // The main hold covers the original price; an approved increase sits in a second (top-up) hold.
     // A lower final price simply captures less than was held.
     const held = o.paypal.heldAmount ?? o.total;
@@ -636,24 +827,7 @@ async function settleInner(orderId: string): Promise<Order> {
       }
     }
     if (!o.paypal.payoutBatchId) {
-      const db = readDB();
-      const k = db.karigars.find((x) => x.id === o.karigarId)!;
-      const s = db.saathis.find((x) => x.id === o.saathiId)!;
-      const karigarAmount = o.mode === "home-visit" ? round2(o.split.karigar + o.split.saathi) : o.split.karigar;
-      type Line = { to: "karigar" | "saathi"; partnerId: string; label: string; receiver: string; amount: number; note: string; ref: string };
-      let lines: Line[];
-      if (o.kind === "basket" && o.jobs) {
-        // One payment in, several karigars out: each gets 90% of their own jobs.
-        const byKarigar = new Map<string, number>();
-        for (const j of o.jobs) byKarigar.set(j.karigarId, round2((byKarigar.get(j.karigarId) ?? 0) + j.price * 0.9));
-        lines = [...byKarigar].map(([kid, amount], i) => {
-          const kk = db.karigars.find((x) => x.id === kid)!;
-          return { to: "karigar" as const, partnerId: kid, label: kk.shop, receiver: kk.payoutEmail, amount, note: `Sudhaar ${o.id}: Ghar Safai repairs. Thank you!`, ref: `${o.id}-K${i + 1}` };
-        });
-      } else {
-        lines = [{ to: "karigar", partnerId: k.id, label: k.shop, receiver: k.payoutEmail, amount: karigarAmount, note: `Sudhaar ${o.id}: ${o.item} repair. Thank you!`, ref: `${o.id}-K` }];
-      }
-      if (o.mode === "pickup") lines.push({ to: "saathi", partnerId: s.id, label: s.name, receiver: s.payoutEmail, amount: o.split.saathi, note: `Sudhaar ${o.id}: pickup & delivery.`, ref: `${o.id}-S` });
+      const lines = payoutLines(o);
       try {
         const batch = await sendPayouts(o.id, lines);
         o.paypal.payoutBatchId = batch.batchId;
@@ -683,6 +857,147 @@ async function settleInner(orderId: string): Promise<Order> {
       }
     }
   });
+}
+
+/** Payout lines for an order: each karigar's share (baskets pay several) plus the Saathi's. */
+function payoutLines(o: Order) {
+  const db = readDB();
+  const k = db.karigars.find((x) => x.id === o.karigarId)!;
+  const s = db.saathis.find((x) => x.id === o.saathiId)!;
+  const karigarAmount = o.mode === "home-visit" ? round2(o.split.karigar + o.split.saathi) : o.split.karigar;
+  type Line = { to: "karigar" | "saathi"; partnerId: string; label: string; receiver: string; amount: number; note: string; ref: string };
+  let lines: Line[];
+  if (o.kind === "basket" && o.jobs) {
+    // One payment in, several karigars out: each gets 90% of their own jobs.
+    const byKarigar = new Map<string, number>();
+    for (const j of o.jobs) byKarigar.set(j.karigarId, round2((byKarigar.get(j.karigarId) ?? 0) + j.price * 0.9));
+    lines = [...byKarigar].map(([kid, amount], i) => {
+      const kk = db.karigars.find((x) => x.id === kid)!;
+      return { to: "karigar" as const, partnerId: kid, label: kk.shop, receiver: kk.payoutEmail, amount, note: `Sudhaar ${o.id}: Ghar Safai repairs. Thank you!`, ref: `${o.id}-K${i + 1}` };
+    });
+  } else {
+    lines = [{ to: "karigar", partnerId: k.id, label: k.shop, receiver: k.payoutEmail, amount: karigarAmount, note: `Sudhaar ${o.id}: ${o.item} repair. Thank you!`, ref: `${o.id}-K` }];
+  }
+  if (o.mode === "pickup") lines.push({ to: "saathi", partnerId: s.id, label: s.name, receiver: s.payoutEmail, amount: o.split.saathi, note: `Sudhaar ${o.id}: pickup & delivery.`, ref: `${o.id}-S` });
+  return lines;
+}
+
+/**
+ * The same settlement for a UPI / card payment: capture the Razorpay hold on the delivery OTP,
+ * refund at once if the final bill came out lower, capture an approved top-up, then split the money
+ * to the karigar(s) and the Saathi with Razorpay Route transfers.
+ */
+async function settleRazorpay(o: Order) {
+  const rz = o.razorpay;
+  const paymentId = rz?.paymentId;
+  if (!rz || !paymentId) return;
+  const topUp = o.priceChange?.status === "approved" ? o.priceChange.topUp : undefined;
+  if (!o.paypal.captureId) {
+    const held = rz.heldPaise ?? rz.orderPaise ?? 0;
+    try {
+      await capturePayment(paymentId, held);
+      o.paypal.captureId = paymentId;
+      rz.capturedPaise = held;
+      o.paypal.capturedAmount = o.paypal.heldAmount ?? o.total;
+      log(o, { actor: "system", kind: "paypal", message: `Captured ₹${held / 100} from the held ${rz.methodLabel ?? "UPI / card"} payment (Razorpay).`, ref: paymentId });
+    } catch (e) {
+      const d = describeRazorpayError(e);
+      log(o, { actor: "system", kind: "error", message: `Capture failed: ${d.message}. It will be retried automatically.`, ref: d.ref });
+      return;
+    }
+    // Razorpay captures the whole hold; a lower final price is given back straight away.
+    const over = topUp ? 0 : held - orderPaise(o);
+    if (over > 0) {
+      try {
+        const r = await refundPayment(paymentId, over, "Lower final repair price", `${o.id}-lower`);
+        rz.capturedPaise = held - over;
+        o.paypal.capturedAmount = o.total;
+        log(o, { actor: "system", kind: "paypal", message: `The final price was lower than the hold, so ₹${over / 100} went straight back to the customer.`, ref: r.refundId });
+      } catch (e) {
+        log(o, { actor: "system", kind: "error", message: `Could not return the ₹${over / 100} difference: ${describeRazorpayError(e).message}. The support team will refund it.` });
+      }
+    }
+  }
+  if (topUp?.razorpayPaymentId && !topUp.captureId) {
+    const paise = topUp.amountPaise ?? usdToPaise(topUp.amount);
+    try {
+      await capturePayment(topUp.razorpayPaymentId, paise);
+      topUp.captureId = topUp.razorpayPaymentId;
+      log(o, { actor: "system", kind: "paypal", message: `Captured the approved extra ₹${paise / 100}.`, ref: topUp.captureId });
+    } catch (e) {
+      log(o, { actor: "system", kind: "error", message: `Extra capture failed: ${describeRazorpayError(e).message}. It will be retried automatically.` });
+      return;
+    }
+  }
+  if (!o.paypal.payoutBatchId) {
+    const lines = payoutLines(o);
+    try {
+      const transfers = await transferSplit(
+        paymentId,
+        lines.map((l) => ({ to: l.to, account: l.to === "karigar" ? config.razorpay.karigarAccount : config.razorpay.saathiAccount, amountPaise: usdToPaise(l.amount), note: l.note })),
+        o.id,
+      );
+      rz.transfers = lines.map((l, i) => ({ to: l.to, label: l.label, id: transfers[i].id, amountPaise: usdToPaise(l.amount), status: transfers[i].status }));
+      o.paypal.payoutBatchId = transfers[0]?.id;
+      o.payouts = [...o.payouts.filter((p) => p.kind === "tip"), ...lines.map((l, i) => ({ to: l.to, partnerId: l.partnerId, label: l.label, receiver: "Razorpay Route", amount: l.amount, status: transfers[i].status, payoutItemId: transfers[i].id }))];
+      log(o, {
+        status: "paid_out",
+        actor: "system",
+        kind: "paypal",
+        message: `Razorpay Route transfers sent: ${lines.map((l) => `${l.label} ₹${usdToPaise(l.amount) / 100}`).join(", ")}. Sudhaar keeps its share.`,
+        ref: o.paypal.payoutBatchId,
+      });
+    } catch (e) {
+      log(o, { actor: "system", kind: "error", message: `Transfer to partners failed: ${describeRazorpayError(e).message}. It will be retried automatically.` });
+    }
+  }
+}
+
+// ---------- Background safety nets (run by the conductor) ----------
+
+/**
+ * Settlement can fail half way (PayPal or Razorpay busy at delivery). Delivered orders that are not
+ * fully captured and paid out are retried a few times, so partners are never left unpaid quietly.
+ */
+export async function retrySettlements(max = 5): Promise<string[]> {
+  const stuck = readDB().orders.filter((o) => o.status === "delivered" && o.paypal.authorizationId && (o.settleRetries ?? 0) < max);
+  const done: string[] = [];
+  for (const o of stuck) {
+    await mutate(o.id, (x) => {
+      x.settleRetries = (x.settleRetries ?? 0) + 1;
+    });
+    const after = await settle(o.id);
+    if (after.status === "paid_out") done.push(o.id);
+    else if ((after.settleRetries ?? 0) >= max) await mutate(o.id, (x) => log(x, { actor: "system", kind: "error", message: `Settlement still incomplete after ${max} tries. Sudhaar team: please check this order.` }));
+  }
+  return done;
+}
+
+/**
+ * A PayPal authorization is only guaranteed for 3 days (the honor period). A repair can take longer,
+ * so a hold older than that is reauthorized once (PayPal allows this within the 29-day authorization).
+ */
+export async function renewOldHolds(): Promise<string[]> {
+  const HONOR_MS = 3 * 24 * 60 * 60 * 1000;
+  const heldAt = (o: Order) => Date.parse(o.events.find((e) => e.status === "authorized")?.at ?? o.createdAt);
+  const old = readDB().orders.filter(
+    (o) => o.rail !== "razorpay" && o.paypal.authorizationId && !o.paypal.captureId && !o.reauthorizedAt && o.total > 0 && !["cancelled", "awaiting_payment", "delivered", "paid_out"].includes(o.status) && Date.now() - heldAt(o) > HONOR_MS,
+  );
+  const renewed: string[] = [];
+  for (const o of old) {
+    await mutate(o.id, async (x) => {
+      x.reauthorizedAt = now();
+      try {
+        const r = await reauthorizeAuthorization(x.paypal.authorizationId!, x.paypal.heldAmount ?? x.total);
+        log(x, { actor: "system", kind: "paypal", message: "The repair is taking more than 3 days, so the PayPal hold was renewed (reauthorized). Still nothing is taken until delivery.", ref: r.authorizationId });
+        x.paypal.authorizationId = r.authorizationId;
+        renewed.push(x.id);
+      } catch (e) {
+        log(x, { actor: "system", kind: "error", message: `Could not renew the PayPal hold: ${describePayPalError(e).message}. Capture will still be tried at delivery.` });
+      }
+    });
+  }
+  return renewed;
 }
 
 // ---------- Resolve Hub ----------
@@ -759,6 +1074,10 @@ export async function resolveComplaint(orderId: string, complaintId: string, dec
       if (remarks) (c.thread ??= []).push({ id: crypto.randomBytes(4).toString("hex"), at: now(), by: "admin", name: /sudhaar/i.test(who) ? who : `${who} (Sudhaar team)`, text: remarks });
     };
     if (decision.action === "refund") {
+      // UPI / card orders refund through Razorpay (in paise), PayPal orders through PayPal.
+      const india = o.rail === "razorpay";
+      const gw = india ? "Razorpay" : "PayPal";
+      const refundVia = (captureId: string, usd: number, note: string, key: string) => (india ? refundPayment(captureId, usdToPaise(usd), note, key) : refundCapture(captureId, usd, note, key));
       const refunded = o.paypal.refunds.reduce((s, r) => s + r.amount, 0);
       const amount = round2(Math.min(decision.amount ?? 0, o.total - refunded));
       if (amount <= 0) throw new FlowError("Nothing left to refund");
@@ -768,22 +1087,22 @@ export async function resolveComplaint(orderId: string, complaintId: string, dec
       const fromMain = extraCapture ? round2(Math.min(amount, Math.max(0, mainLeft))) : amount;
       try {
         if (extraCapture && amount > fromMain) {
-          const extra = await refundCapture(extraCapture, round2(amount - fromMain), `Sudhaar Resolve Hub: ${o.item} (extra work)`, `${c.id}-x`);
+          const extra = await refundVia(extraCapture, round2(amount - fromMain), `Sudhaar Resolve Hub: ${o.item} (extra work)`, `${c.id}-x`);
           o.paypal.refunds.push({ id: extra.refundId, amount: round2(amount - fromMain), status: extra.status });
           if (fromMain <= 0) {
             c.resolution = { action: "refund", amount, refundId: extra.refundId, at: now() };
-            close("resolved", `PayPal refund of $${amount.toFixed(2)} approved (refund ${extra.refundId})`);
-            log(o, { actor: "admin", kind: "paypal", message: `Refunded $${amount.toFixed(2)} to the customer via PayPal (status ${extra.status}).`, ref: extra.refundId });
+            close("resolved", `${gw} refund of $${amount.toFixed(2)} approved (refund ${extra.refundId})`);
+            log(o, { actor: "admin", kind: "paypal", message: `Refunded $${amount.toFixed(2)} to the customer via ${gw} (status ${extra.status}).`, ref: extra.refundId });
             return;
           }
         }
-        const r = await refundCapture(o.paypal.captureId!, fromMain, `Sudhaar Resolve Hub: ${c.issue.replaceAll("_", " ")} on ${o.item}`, c.id);
+        const r = await refundVia(o.paypal.captureId!, fromMain, `Sudhaar Resolve Hub: ${c.issue.replaceAll("_", " ")} on ${o.item}`, c.id);
         o.paypal.refunds.push({ id: r.refundId, amount: fromMain, status: r.status });
         c.resolution = { action: "refund", amount, refundId: r.refundId, at: now() };
-        close("resolved", `PayPal refund of $${amount.toFixed(2)} approved (refund ${r.refundId})`);
-        log(o, { actor: "admin", kind: "paypal", message: `Refunded $${amount.toFixed(2)} to the customer via PayPal (status ${r.status}).`, ref: r.refundId });
+        close("resolved", `${gw} refund of $${amount.toFixed(2)} approved (refund ${r.refundId})`);
+        log(o, { actor: "admin", kind: "paypal", message: `Refunded $${amount.toFixed(2)} to the customer via ${gw} (status ${r.status}).`, ref: r.refundId });
       } catch (e) {
-        const d = describePayPalError(e);
+        const d = india ? describeRazorpayError(e) : describePayPalError(e);
         throw new FlowError(`Refund failed: ${d.message}`, 502);
       }
     } else if (decision.action === "re_repair") {
@@ -901,11 +1220,18 @@ export async function decidePriceChange(orderId: string, approve: boolean): Prom
     }
     if (pc.to < pc.from) {
       applyPrice(o, pc);
-      log(o, { actor: "customer", message: `Customer approved the lower price of $${pc.to.toFixed(2)}. PayPal will capture less than it holds.` });
+      log(o, { actor: "customer", message: `Customer approved the lower price of $${pc.to.toFixed(2)}. ${o.rail === "razorpay" ? "The difference goes straight back to them when the payment is captured." : "PayPal will capture less than it holds."}` });
       return;
     }
     // A higher price needs a second hold for the difference, approved in PayPal like the first.
     const extra = round2(pc.to - pc.from);
+    if (o.rail === "razorpay") {
+      // UPI / card: the second hold is a Razorpay order the customer pays in the checkout.
+      pc.topUp = { amount: extra, amountPaise: usdToPaise(extra) };
+      pc.status = "awaiting_payment";
+      log(o, { actor: "customer", message: `Customer approved the new price. A hold for the extra ₹${usdToPaise(extra) / 100} is ready for them to pay by UPI or card.` });
+      return;
+    }
     try {
       const pp = await createTopUpOrder(o, extra, pc.reason);
       pc.topUp = { amount: extra, paypalOrderId: pp.id };
@@ -976,6 +1302,11 @@ export async function startTip(orderId: string, input: { karigarId: string; inr:
     const k = readDB().karigars.find((x) => x.id === input.karigarId)!;
     const amount = round2(input.inr / INR_PER_USD);
     const tipId = id("TIP");
+    if (o.rail === "razorpay") {
+      // UPI / card customers tip the same way they paid; the checkout creates the Razorpay order.
+      o.tips.push({ id: tipId, karigarId: k.id, amount, amountPaise: input.inr * 100, status: "awaiting_payment", createdAt: now() });
+      return;
+    }
     try {
       const pp = await createTipOrder(o, tipId, k.shop, amount);
       o.tips.push({ id: tipId, karigarId: k.id, amount, status: "awaiting_payment", paypalOrderId: pp.id, createdAt: now() });

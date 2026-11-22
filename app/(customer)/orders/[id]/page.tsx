@@ -14,6 +14,7 @@ import { EventLog } from "@/components/EventLog";
 import { FamilyPayShare } from "@/components/FamilyPay";
 import { NeighbourhoodMap } from "@/components/NeighbourhoodMap";
 import { PayPalCheckout } from "@/components/PayPalCheckout";
+import { PaymentChooser, RazorpayCheckout } from "@/components/RazorpayCheckout";
 import { SlotLine } from "@/components/SlotLine";
 import { useLang } from "@/components/LanguageProvider";
 import { langMeta } from "@/lib/i18n";
@@ -179,7 +180,7 @@ function OrderPageInner({ params }: { params: Promise<{ id: string }> }) {
                   </button>
                 </div>
               ) : (
-                <PayPalCheckout orderId={order.id} paypalOrderId={order.paypal.orderId} total={order.total} inrLabel={orderRupees(order)} onApproved={load} />
+                <PaymentChooser order={order} onApproved={load} />
               )}
             </CardContent>
           </Card>
@@ -327,9 +328,26 @@ function OrderPageInner({ params }: { params: Promise<{ id: string }> }) {
               <h2 className="flex items-center gap-2 font-bold">
                 <Receipt className="size-4 text-primary" /> {t("oPayment")}
               </h2>
-              <Badge variant="paypal">PayPal {order.paypal.mode}</Badge>
+              {order.rail === "razorpay" ? (
+                <Badge variant="outline" className="border-teal text-teal">Razorpay {order.razorpay?.mode} · {order.razorpay?.methodLabel ?? "UPI / card"}</Badge>
+              ) : (
+                <Badge variant="paypal">PayPal {order.paypal.mode}</Badge>
+              )}
             </div>
             <Breakdown order={order} />
+            {order.rail === "razorpay" ? (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                <Ref k="Razorpay order" v={order.razorpay?.orderId} />
+                <Ref k="Payment (held)" v={order.paypal.authorizationId} />
+                <Ref k="Captured" v={order.paypal.captureId ? `${order.paypal.captureId} (₹${(order.razorpay?.capturedPaise ?? 0) / 100})` : undefined} />
+                {(order.razorpay?.transfers ?? []).map((tr) => (
+                  <Ref key={tr.id} k={`Route → ${tr.label}`} v={`₹${tr.amountPaise / 100} · ${tr.id} (${tr.status})`} />
+                ))}
+                {order.paypal.refunds.map((r) => (
+                  <Ref key={r.id} k={`Refund ${money(r.amount)}`} v={`${r.id} (${r.status})`} />
+                ))}
+              </dl>
+            ) : (
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
               <Ref k="PayPal order" v={order.paypal.orderId} />
               <Ref k="Authorization" v={order.paypal.authorizationId} />
@@ -340,6 +358,7 @@ function OrderPageInner({ params }: { params: Promise<{ id: string }> }) {
                 <Ref key={r.id} k={`Refund ${money(r.amount)}`} v={`${r.id} (${r.status})`} />
               ))}
             </dl>
+            )}
             {order.paypal.invoiceUrl && (
               <Button asChild variant="outline" className="w-full">
                 <a href={order.paypal.invoiceUrl} target="_blank" rel="noreferrer">
@@ -525,10 +544,14 @@ function PriceChangeCard({ order, onChange }: { order: Order; onChange: () => vo
             </div>
           </>
         )}
-        {pc.status === "awaiting_payment" && pc.topUp?.paypalOrderId && (
+        {pc.status === "awaiting_payment" && pc.topUp && (order.rail === "razorpay" || pc.topUp.paypalOrderId) && (
           <>
             <p className="text-sm font-semibold">{t("pcPayExtra", vars)}</p>
-            <PayPalCheckout orderId={order.id} paypalOrderId={pc.topUp.paypalOrderId} total={pc.topUp.amount} onApproved={onChange} topUp />
+            {order.rail === "razorpay" ? (
+              <RazorpayCheckout orderId={order.id} purpose="topup" inrLabel={rupees(pc.topUp.amount)} onApproved={onChange} />
+            ) : (
+              <PayPalCheckout orderId={order.id} paypalOrderId={pc.topUp.paypalOrderId!} total={pc.topUp.amount} onApproved={onChange} topUp />
+            )}
           </>
         )}
         {error && <p className="text-xs text-destructive">{error}</p>}

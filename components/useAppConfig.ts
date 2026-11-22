@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 export type AppConfig = {
   paypal: { mode: "sandbox" | "simulated"; clientId: string | null; problem?: string | null; demoBuyer?: { email: string; password: string } | null };
+  razorpay?: { mode: "test" | "simulated"; keyId: string | null; problem?: string | null };
   ai: { mode: "gemini" | "simulated"; model: string | null; problem?: string | null };
   currency: string;
   voice?: { phoneNumber: string | null; callback: boolean };
