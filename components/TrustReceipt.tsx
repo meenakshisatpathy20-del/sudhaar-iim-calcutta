@@ -4,6 +4,7 @@ import { BadgeCheck, CircleDashed, Clock, ShieldCheck, TriangleAlert } from "luc
 import type { Order, OrderStatus, Quote } from "@/lib/types";
 import type { Lang } from "@/lib/i18n";
 import { money } from "@/components/api";
+import { rupees } from "@/components/Inr";
 import { useLang } from "@/components/LanguageProvider";
 import { lx, type L8 } from "@/components/localText";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,16 @@ const T: Record<string, L8> = {
     ta: "சான்று இருந்தால் மட்டுமே ஒரு படி பச்சையாகும். PayPal குறிப்புகளை sandbox டாஷ்போர்டில் சரிபார்க்கலாம். Sandbox = சோதனைப் பணம்; தொகைகள் USD-யில்.",
     or: "ପ୍ରମାଣ ଥିଲେ ହିଁ ପଦକ୍ଷେପ ସବୁଜ ହୁଏ। PayPal ରେଫରେନ୍ସ sandbox ଡ୍ୟାସବୋର୍ଡରେ ଯାଞ୍ଚ କରିହେବ। Sandbox = ଟେଷ୍ଟ ଟଙ୍କା; ପରିମାଣ USDରେ।",
     kn: "ಸಾಕ್ಷ್ಯ ಇದ್ದಾಗ ಮಾತ್ರ ಹಂತ ಹಸಿರಾಗುತ್ತದೆ. PayPal ಉಲ್ಲೇಖಗಳನ್ನು sandbox ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ನಲ್ಲಿ ಪರಿಶೀಲಿಸಬಹುದು. Sandbox = ಪರೀಕ್ಷಾ ಹಣ; ಮೊತ್ತಗಳು USDಯಲ್ಲಿ.",
+  },
+  footerIndia: {
+    en: "A step turns green only when its evidence exists. Razorpay references can be checked in the Razorpay test dashboard. Test mode = no real money; amounts in ₹.",
+    hi: "हर कदम तभी हरा होता है जब उसका सबूत मौजूद हो। Razorpay रेफ़रेंस Razorpay टेस्ट डैशबोर्ड में जाँचे जा सकते हैं। टेस्ट मोड = असली पैसा नहीं; रकम ₹ में है।",
+    bn: "প্রমাণ থাকলে তবেই একটি ধাপ সবুজ হয়। Razorpay রেফারেন্স Razorpay টেস্ট ড্যাশবোর্ডে যাচাই করা যায়। টেস্ট মোড = আসল টাকা নয়; অঙ্ক ₹-এ।",
+    mr: "पुरावा असेल तरच टप्पा हिरवा होतो. Razorpay संदर्भ Razorpay चाचणी डॅशबोर्डमध्ये तपासता येतात. चाचणी मोड = खरे पैसे नाहीत; रक्कम ₹ मध्ये.",
+    te: "సాక్ష్యం ఉన్నప్పుడే దశ ఆకుపచ్చగా మారుతుంది. Razorpay రిఫరెన్సులను Razorpay టెస్ట్ డాష్‌బోర్డ్‌లో చూడవచ్చు. టెస్ట్ మోడ్ = నిజమైన డబ్బు కాదు; మొత్తాలు ₹లో.",
+    ta: "சான்று இருந்தால் மட்டுமே ஒரு படி பச்சையாகும். Razorpay குறிப்புகளை Razorpay சோதனை டாஷ்போர்டில் சரிபார்க்கலாம். சோதனை முறை = உண்மையான பணம் இல்லை; தொகைகள் ₹-இல்.",
+    or: "ପ୍ରମାଣ ଥିଲେ ହିଁ ପଦକ୍ଷେପ ସବୁଜ ହୁଏ। Razorpay ରେଫରେନ୍ସ Razorpay ଟେଷ୍ଟ ଡ୍ୟାସବୋର୍ଡରେ ଯାଞ୍ଚ କରିହେବ। ଟେଷ୍ଟ ମୋଡ = ପ୍ରକୃତ ଟଙ୍କା ନୁହେଁ; ପରିମାଣ ₹ରେ।",
+    kn: "ಸಾಕ್ಷ್ಯ ಇದ್ದಾಗ ಮಾತ್ರ ಹಂತ ಹಸಿರಾಗುತ್ತದೆ. Razorpay ಉಲ್ಲೇಖಗಳನ್ನು Razorpay ಪರೀಕ್ಷಾ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ನಲ್ಲಿ ಪರಿಶೀಲಿಸಬಹುದು. ಪರೀಕ್ಷಾ ಮೋಡ್ = ನಿಜವಾದ ಹಣ ಅಲ್ಲ; ಮೊತ್ತಗಳು ₹ ನಲ್ಲಿ.",
   },
   estimate: { en: "AI repair estimate", hi: "AI मरम्मत अनुमान", bn: "AI মেরামতের অনুমান", mr: "AI दुरुस्ती अंदाज", te: "AI రిపేర్ అంచనా", ta: "AI பழுது மதிப்பீடு", or: "AI ମରାମତି ଆକଳନ", kn: "AI ರಿಪೇರಿ ಅಂದಾಜು" },
   estimateDetail: { en: "{r} estimate; final price set by the karigar", hi: "{r} अनुमान; अंतिम कीमत कारीगर तय करेंगे", bn: "{r} অনুমান; চূড়ান্ত দাম কারিগর ঠিক করবেন", mr: "{r} अंदाज; अंतिम किंमत कारागीर ठरवतील", te: "{r} అంచనా; తుది ధర కారీగర్ నిర్ణయిస్తారు", ta: "{r} மதிப்பீடு; இறுதி விலையை கைவினைஞர் முடிவு செய்வார்", or: "{r} ଆକଳନ; ଶେଷ ଦାମ କାରିଗର ସ୍ଥିର କରିବେ", kn: "{r} ಅಂದಾಜು; ಅಂತಿಮ ಬೆಲೆಯನ್ನು ಕಾರಿಗರ್ ನಿರ್ಧರಿಸುತ್ತಾರೆ" },
@@ -81,12 +92,14 @@ export function buildTrustSteps(o: Order, quote: Quote | null | undefined, lang:
   const payoutsOk = o.payouts.length > 0 && o.payouts.every((p) => /SUCCESS|COMPLETED|PROCESSED|SETTLED/i.test(p.status));
   const payoutsFailed = o.payouts.some((p) => /FAIL|DENIED|RETURNED|BLOCKED/i.test(p.status));
   const refunded = o.paypal.refunds.reduce((s, r) => s + r.amount, 0);
+  // UPI / card orders are shown in rupees end to end; PayPal orders keep the USD PayPal moves.
+  const cash = (usd: number) => (india ? rupees(usd) : money(usd));
 
   return [
     {
       label: t("estimate"),
       state: quote || o.quoteId ? "done" : "todo",
-      detail: quote ? t("estimateDetail", { r: `${money(quote.repairLow)}–${money(quote.repairHigh)}` }) : t("estimateRecorded"),
+      detail: quote ? t("estimateDetail", { r: `${cash(quote.repairLow)}–${cash(quote.repairHigh)}` }) : t("estimateRecorded"),
       ref: o.quoteId,
       source: quote ? (quote.source === "gemini" ? t("realGemini") : t("estimateTable")) : undefined,
     },
@@ -119,7 +132,7 @@ export function buildTrustSteps(o: Order, quote: Quote | null | undefined, lang:
     {
       label: t("captured"),
       state: o.paypal.captureId ? "done" : reached(o, "delivered") ? "pending" : "todo",
-      detail: o.paypal.captureId ? t("capturedDetail", { a: india ? `₹${(o.razorpay?.capturedPaise ?? 0) / 100}` : money(o.paypal.capturedAmount ?? o.total) }) + (refunded ? t("refundedPart", { a: money(refunded) }) : "") : t("notCaptured"),
+      detail: o.paypal.captureId ? t("capturedDetail", { a: india ? `₹${(o.razorpay?.capturedPaise ?? 0) / 100}` : money(o.paypal.capturedAmount ?? o.total) }) + (refunded ? t("refundedPart", { a: cash(refunded) }) : "") : t("notCaptured"),
       ref: o.paypal.captureId,
       source: o.paypal.captureId ? pp : undefined,
     },
@@ -127,7 +140,7 @@ export function buildTrustSteps(o: Order, quote: Quote | null | undefined, lang:
       label: t("payouts"),
       state: payoutsFailed ? "warn" : payoutsOk ? "done" : o.paypal.payoutBatchId ? "pending" : "todo",
       detail: o.payouts.length
-        ? o.payouts.map((p) => `${p.label ?? (p.to === "karigar" ? t("karigar") : t("saathi"))} ${money(p.amount)}: ${p.status}`).join(" · ")
+        ? o.payouts.map((p) => `${p.label ?? (p.to === "karigar" ? t("karigar") : t("saathi"))} ${cash(p.amount)}: ${p.status}`).join(" · ")
         : t("payoutsPending"),
       ref: o.paypal.payoutBatchId,
       source: o.paypal.payoutBatchId ? (india ? (sandbox ? "Razorpay Route" : "Razorpay Route (simulated)") : !sandbox ? t("simulated") : payoutsOk ? t("ppConfirmed") : t("batchSubmitted")) : undefined,
@@ -169,7 +182,7 @@ export function TrustReceipt({ order, quote }: { order: Order; quote?: Quote | n
           </li>
         ))}
       </ol>
-      <p className="mt-3 text-[11px] text-muted-foreground">{lx(T.footer, lang)}</p>
+      <p className="mt-3 text-[11px] text-muted-foreground">{lx(order.rail === "razorpay" ? T.footerIndia : T.footer, lang)}</p>
     </section>
   );
 }

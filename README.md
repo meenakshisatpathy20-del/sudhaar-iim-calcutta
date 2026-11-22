@@ -5,7 +5,7 @@
 **A doorstep repair marketplace for local karigars (informal repairers), built on PayPal + AI.**
 Snap a photo of something broken. AI estimates the repair cost against the price of buying new. A verified local karigar fixes it, a Repair Saathi does the pickup and delivery, and the customer's payment is **held, not taken, until the repaired item is back in their hands**. Customers in India pay with **UPI (GPay, PhonePe, Paytm), credit or debit cards, or netbanking** through Razorpay; a son or daughter abroad pays with **PayPal**. Both rails hold the money the same way. On the delivery OTP, Sudhaar captures the payment and sends a **PayPal Payouts batch** to the karigar and the Saathi, then reconciles each payout's real status. Every order ends in a **Repair Trust Receipt**: one proof trail where each step is green only when its evidence (PayPal id, OTP check, photo review) exists.
 
-> 🌐 **Live demo:** deploy your own with [`render.yaml`](render.yaml) (link added once deployed) · 📸 **[Screenshots](docs/SCREENSHOTS.md)** · 🧭 **[Demo guide: every page and feature](docs/DEMO-GUIDE.md)** (also in the app at `/guide`) · ✅ **[Test evidence](docs/TESTING.md)**
+> 🌐 **Live demo:** deploy your own with [`render.yaml`](render.yaml) (link added once deployed) · 📸 **[Screenshots](docs/SCREENSHOTS.md)** · 🎤 **[Stage demo for pitches](docs/PITCH-DEMO.md)** (`/pitch`: one repair, start to finish, clicker-friendly) · 🧭 **[Demo guide: every page and feature](docs/DEMO-GUIDE.md)** (also in the app at `/guide`) · ✅ **[Test evidence](docs/TESTING.md)**
 
 ---
 
