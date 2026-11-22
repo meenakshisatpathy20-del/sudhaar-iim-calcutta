@@ -451,7 +451,7 @@ const BASE = {
     kpQuote: "Get a quote from {name}",
     // Misc
     demoShared: "Demo account: judges share this login, so you may see other testers' repairs too.",
-    demoProfile: "Shared demo account for hackathon judges.",
+    demoProfile: "Shared demo account for testing.",
     rtTitle: "How was the repair?",
     rtFor: "Rate {shop}",
     rtStars: "{n} of 5 stars",
@@ -1260,7 +1260,7 @@ const BASE = {
     kpQuote: "{name} से कोटेशन लें",
     // Misc
     demoShared: "डेमो अकाउंट: जज यही लॉगिन इस्तेमाल करते हैं, इसलिए आपको दूसरों की टेस्ट रिपेयर भी दिख सकती हैं।",
-    demoProfile: "हैकाथॉन जजों के लिए साझा डेमो अकाउंट।",
+    demoProfile: "टेस्टिंग के लिए साझा डेमो अकाउंट।",
     rtTitle: "मरम्मत कैसी रही?",
     rtFor: "{shop} को रेटिंग दें",
     rtStars: "{n} सितारे",

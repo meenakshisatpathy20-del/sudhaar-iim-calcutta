@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Sudhaar API (PayPal AI Hackathon)",
+    "name": "Sudhaar API",
     "description": "End-to-end flow: AI quote -> PayPal authorize -> OTP-gated job -> capture -> payouts -> invoice -> Resolve Hub refund.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
