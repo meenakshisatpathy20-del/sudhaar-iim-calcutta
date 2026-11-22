@@ -27,6 +27,17 @@ services:
         sync: false
       - key: PAYPAL_DEMO_BUYER_PASSWORD
         sync: false
+      # Razorpay test mode: UPI, cards, netbanking inside India (README: Razorpay test-mode setup)
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: RAZORPAY_KARIGAR_ACCOUNT
+        sync: false
+      - key: RAZORPAY_SAATHI_ACCOUNT
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       # Bolna phone line (docs/BOLNA.md). VOICE_API_TOKEN: a long random secret you also give Bolna.

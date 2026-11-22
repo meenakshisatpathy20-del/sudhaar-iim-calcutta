@@ -1,6 +1,6 @@
 # Sudhaar demo guide
 
-A walkthrough of every page and feature, written for judges and first-time visitors. The same guide is inside the app at **`/guide`**, with one-tap logins for each role.
+A walkthrough of every page and feature, written for reviewers and first-time visitors. The same guide is inside the app at **`/guide`**, with one-tap logins for each role.
 
 Sudhaar is **one website** with four roles. Customers use Home, My Repairs, Resolve Hub, Talk and Care. The karigar, Saathi and admin dashboards are on the same site behind a partner login (the **Partners** menu at the top right, or `/partner`):
 

@@ -1,11 +1,11 @@
 # Sudhaar — Repair, don't replace
 
-*By **Team Innoverse**: Meenakshi Satpathy & Manas Girdhar · PayPal AI Hackathon 2026*
+*By **Meenakshi Satpathy***
 
 **A doorstep repair marketplace for local karigars (informal repairers), built on PayPal + AI.**
-Snap a photo of something broken. AI estimates the repair cost against the price of buying new. A verified local karigar fixes it, a Repair Saathi does the pickup and delivery, and the customer's PayPal payment is **authorized (held, not captured) until the repaired item is back in their hands**. On the delivery OTP, Sudhaar captures the payment and sends a **PayPal Payouts batch** to the karigar and the Saathi, then reconciles each payout's real status. Every order ends in a **Repair Trust Receipt**: one proof trail where each step is green only when its evidence (PayPal id, OTP check, photo review) exists.
+Snap a photo of something broken. AI estimates the repair cost against the price of buying new. A verified local karigar fixes it, a Repair Saathi does the pickup and delivery, and the customer's payment is **held, not taken, until the repaired item is back in their hands**. Customers in India pay with **UPI (GPay, PhonePe, Paytm), credit or debit cards, or netbanking** through Razorpay; a son or daughter abroad pays with **PayPal**. Both rails hold the money the same way. On the delivery OTP, Sudhaar captures the payment and sends a **PayPal Payouts batch** to the karigar and the Saathi, then reconciles each payout's real status. Every order ends in a **Repair Trust Receipt**: one proof trail where each step is green only when its evidence (PayPal id, OTP check, photo review) exists.
 
-> 🌐 **Live demo:** [sudhaar-mm59.onrender.com](https://sudhaar-mm59.onrender.com) (first load can take ~1 min on the free plan) · 🎬 **Demo video:** on our Devpost page · 📸 **[Screenshots](docs/SCREENSHOTS.md)** · 🧭 **[Demo guide: every page and feature](docs/DEMO-GUIDE.md)** (also in the app at `/guide`) · ✅ **[Test evidence](docs/TESTING.md)** (lifecycle + security checks, a real sandbox authorize → capture → payouts → invoice run, 8-language AI)
+> 🌐 **Live demo:** deploy your own with [`render.yaml`](render.yaml) (link added once deployed) · 📸 **[Screenshots](docs/SCREENSHOTS.md)** · 🧭 **[Demo guide: every page and feature](docs/DEMO-GUIDE.md)** (also in the app at `/guide`) · ✅ **[Test evidence](docs/TESTING.md)**
 
 ---
 
@@ -20,9 +20,9 @@ Sudhaar fixes each of those problems:
 | "I don't know a good repairer nearby" | Verified karigars compared side by side by price, rating, **distance** and ready time |
 | "I have to carry it to a shop and go back" | **Repair Saathi** pickup and delivery (plumbers and electricians do home visits) |
 | "Is it worth repairing?" | **AI Snap & Quote**: repair-cost range vs. new price, so you see the saving |
-| "I'll get overcharged / I can't trust a stranger" | Price shown upfront, **PayPal holds the money** until delivery, OTP at every handover |
+| "I'll get overcharged / I can't trust a stranger" | Price shown upfront, **the money is only held** (UPI / card via Razorpay, or PayPal) until delivery, OTP at every handover |
 | "What if it breaks again?" | 15-day warranty (30 with Sudhaar Care) and **Resolve Hub**, a full claims desk built into the site: claim ids, priority with a decision deadline (SLA), photo evidence, a three-way conversation (customer, karigar, Sudhaar team), status workflow, activity log, notifications, and PayPal refunds approved by a person |
-| Karigars get few customers and get paid late | Free listing, karigar keeps **90%** of the repair charge, **PayPal payout right after delivery** |
+| Karigars get few customers and get paid late | Free listing, karigar keeps **90%** of the repair charge, **paid right after delivery** (Razorpay Route transfer for UPI / card orders, PayPal Payouts for PayPal orders) |
 
 ## What it does (end to end)
 
@@ -103,6 +103,17 @@ Payment never happens on the call. Each phone booking creates a PayPal order and
 ### 🧾 Fair price changes
 A karigar sometimes finds more damage after opening the item. They can't just charge more: they send a new price with a reason, the customer approves or declines it in the app, and an increase is paid as a **second PayPal authorization** for only the difference. The repair can't be marked done while a price change is waiting. On delivery both holds are captured, and a later refund is split across both captures.
 
+### 🇮🇳 UPI, cards and netbanking (Razorpay)
+Most customers in India pay by UPI, so the booking page opens on **UPI · GPay · Cards**, with **PayPal (from abroad)** one tap away for family paying from another country.
+
+- **Same promise, local rail:** the Razorpay order uses **manual capture**, so a successful UPI or card payment is only *authorized* (held). Sudhaar **captures it on the delivery OTP**, exactly like the PayPal authorization. If the final price came out lower, the difference is refunded straight after capture. Cancelling before pickup simply never captures, and Razorpay releases the hold automatically.
+- **Never trusts the browser:** the checkout's HMAC signature is checked with the secret key, then the payment is fetched from Razorpay and must belong to this booking's Razorpay order, match the rupee bill to the paisa and be `authorized`. A forged or replayed payment is rejected.
+- **The split:** after capture, **Razorpay Route** transfers the karigar's 90% and the Saathi's 75% of the pickup fee to their linked accounts. Ghar Safai baskets pay each karigar for their own items.
+- **Price changes, tips and refunds** stay on the rail the customer chose: a higher price is a second UPI / card hold, a ₹50 tip goes in full to the karigar by Route, and Resolve Hub refunds go back through Razorpay.
+- **Tab closed mid-payment?** The `payment.authorized` webhook (signature-checked, processed once per event id) completes the booking anyway.
+- **Rupees end to end:** Razorpay charges the exact rupee bill the customer sees (each line rounded the way the bill shows it).
+- Without Razorpay test keys, a clearly labelled stand-in sheet lets you pick **UPI (GPay)**, **Debit / credit card** or **Netbanking**, and the whole flow runs simulated.
+
 ## How PayPal is used
 
 All calls go to the PayPal **sandbox**. Every PayPal id appears on the order page and in the admin grid, so you can verify each one in the sandbox dashboard.
@@ -120,7 +131,22 @@ All calls go to the PayPal **sandbox**. Every PayPal id appears on the order pag
 | **Subscriptions v1** | `createSubscription`, `getSubscription`, `cancelSubscription` ([`lib/care.ts`](lib/care.ts)) | Customer approves on PayPal; Sudhaar confirms the status with PayPal before activating; cancel from the app |
 | **Refunds (Payments v2)** | `refundCapture` | Partial or full refunds from Resolve Hub (always approved by a person on the support desk), split across both captures when there was a price increase |
 | **Webhooks** | [`app/api/paypal/webhook/route.ts`](app/api/paypal/webhook/route.ts) | Verifies signatures (`verify-webhook-signature`), logs events on the order, and (only when verified) updates Sudhaar Care from `BILLING.SUBSCRIPTION.*` and `PAYMENT.SALE.COMPLETED` |
+| **Reauthorize (Payments v2)** | `reauthorizeAuthorization` | A hold older than PayPal's 3-day honor period is renewed once automatically, so long repairs can still be captured |
 | **PayPal Agent Toolkit** | [`lib/agent.ts`](lib/agent.ts) | `get_order`, `get_invoice`, `list_invoices`, `get_refund`, `list_transactions`, `list_disputes` as agent tools |
+
+## How Razorpay is used (India)
+
+All calls use Razorpay **test mode** (keys starting `rzp_test_`; live keys are refused). Amounts are in paise.
+
+| Razorpay capability | Where | What Sudhaar does with it |
+|---|---|---|
+| **Checkout.js** (UPI intent / collect, cards, netbanking) | [`components/RazorpayCheckout.tsx`](components/RazorpayCheckout.tsx) | The payment sheet on the order page and the Family Pay page, also for top-ups and tips |
+| **Orders API, `payment.capture: manual`** | [`lib/razorpay.ts`](lib/razorpay.ts) `createRazorpayOrder` | Holds the customer's money at booking, like PayPal AUTHORIZE |
+| **Signature check + Payments fetch** | `checkoutSignatureValid`, `fetchPayment` | Proves the payment is real, for this order, for this amount, and held |
+| **Payments capture** | `capturePayment` | Only after the delivery OTP |
+| **Refunds** | `refundPayment` | Lower final price, and Resolve Hub refunds (approved by a person) |
+| **Route transfers** | `transferSplit`, `getTransfer` | Karigar and Saathi shares, and tips, to their linked accounts; partners can refresh the status |
+| **Webhooks** | [`app/api/razorpay/webhook/route.ts`](app/api/razorpay/webhook/route.ts) | HMAC-verified, idempotent; completes a booking if the customer closed the tab after paying; keeps transfer statuses in step |
 
 ## How AI is used in the product
 
@@ -133,14 +159,11 @@ Google **Gemini** (`gemini-flash-latest` by default, via Google's official `@goo
 
 Without a `GEMINI_API_KEY`, features 1–3 fall back to a deterministic estimator that is clearly labelled "Simulated" in the UI. The agent needs a key. If Gemini is busy or over its usage limit, quotes fall back to the price table, photo checks go to a person, and the agent asks the customer to try again in a minute.
 
-## Team Innoverse: who built it
+## Who built it
 
-| Member | Role |
-|---|---|
-| **Meenakshi Satpathy** | Developer |
-| **Manas Girdhar** | Developer |
+Built by **Meenakshi Satpathy**: the idea (from a real problem at home), research, product design, development, payments integration and testing.
 
-**Built with:** Next.js and TypeScript, PayPal (Orders v2 authorize/capture, Payouts, Invoicing, Refunds, Subscriptions, Agent Toolkit), Google Gemini (vision quotes, photo checks, Repair Agent, text-to-speech), AG Grid, Leaflet/OpenStreetMap, Upstash Redis, Render.
+**Built with:** Next.js and TypeScript, Razorpay (Orders with manual capture, Checkout, Refunds, Route, Webhooks), PayPal (Orders v2 authorize/capture, Payouts, Invoicing, Refunds, Subscriptions, Agent Toolkit), Google Gemini (vision quotes, photo checks, Repair Agent, text-to-speech), AG Grid, Leaflet/OpenStreetMap, Upstash Redis, Render.
 
 ## Design decisions (and why)
 
@@ -174,7 +197,7 @@ So a website booking keeps roughly ₹59, and a phone booking still covers its c
 - **Render**: one-click deploy via [`render.yaml`](render.yaml).
 - **Postman**: [`postman/Sudhaar.postman_collection.json`](postman/Sudhaar.postman_collection.json) drives the whole flow through the API.
 
-## Trust and safety (hackathon hardening)
+## Trust and safety
 
 | Guarantee | Where it is enforced |
 |---|---|
@@ -188,21 +211,27 @@ So a website booking keeps roughly ₹59, and a phone booking still covers its c
 | Phone cancellations need the caller's 4-digit PIN, not just caller ID | `lib/voice.ts` `voiceCancel()` |
 | Gemini overload/timeouts switch to a lighter model for 5 minutes, so demos never hang | `lib/llm.ts` |
 | Quotes, agent replies and **spoken replies in all 8 languages** (browser voice, else Gemini TTS) | `lib/ai.ts`, `app/api/tts`, `components/voice.ts` |
+| **OTP guessing is stopped**: after 5 wrong tries the code is replaced, the customer is texted the new one and the handover pauses for 15 minutes (a 4-digit code can't be brute-forced) | `lib/orders.ts` `advance()` |
+| **No silent failures in settlement**: a capture, payout or transfer that fails at delivery is retried by the background conductor (up to 5 times), then flagged for the team | `lib/orders.ts` `retrySettlements()`, `lib/symphony.ts` |
+| **Long repairs keep their hold**: PayPal holds older than 3 days are reauthorized once | `lib/orders.ts` `renewOldHolds()` |
+| **One-time coupons can't be used twice** by paying two unpaid bookings: the code is checked again at the moment of payment | `lib/orders.ts` `assertCouponStillValid()` |
+| UPI / card payments are verified with Razorpay's signature **and** a server-side fetch (order, amount, status) before anything is held | `lib/orders.ts` `approveRazorpay()` |
 | Capture only after delivery OTP; payouts only after capture; payout status reconciled from PayPal (`SUCCESS`/`PENDING`/`FAILED`), not assumed | `lib/orders.ts`, `app/api/partner/payouts` |
 | One-tap judge logins are a **sandbox-only** convenience (synthetic data, test money). `DEMO_ADMIN=off` disables demo admin, `ALLOW_RESET=off` disables reset; reset is rate-limited | `app/api/auth/demo`, `app/api/reset` |
 
-**Payments wording:** PayPal Orders v2 `intent=AUTHORIZE` is an authorization, not regulated escrow. Everything runs in the **PayPal sandbox (USD test money)**. INR amounts in the UI use a fixed, labelled demo rate (`INR_PER_USD=85`), not live FX. PayPal does not offer domestic payments inside India, so a production launch would use local rails for domestic orders and PayPal for cross-border (diaspora Family Pay) payments.
+**Payments wording:** PayPal Orders v2 `intent=AUTHORIZE` and Razorpay manual capture are authorizations, not regulated escrow. Everything runs in the **PayPal sandbox (USD test money)**. INR amounts in the UI use a fixed, labelled demo rate (`INR_PER_USD=85`), not live FX. PayPal does not offer domestic payments inside India, so domestic orders run on **Razorpay (UPI, cards, netbanking, in rupees)** and PayPal covers cross-border (diaspora Family Pay) payments.
 
 ## Known limitations
 
 - The phone line (Bolna) needs a Bolna account and number; without them the site hides it.
-- Authorizations have an honor period (about 3 days); long repairs may need reauthorization, which is not yet automated.
+- PayPal holds are renewed once after 3 days (reauthorize). Razorpay releases an uncaptured hold after `RAZORPAY_HOLD_MINUTES` (default 5 days), so a repair longer than that would need the customer to pay again.
+- The Razorpay rail is tested end to end in simulation (`npm run test:india`); run it once with real `rzp_test_` keys before showing it live. Route transfers need Route enabled on the Razorpay account and linked accounts for the partners.
 - A photo can screen evidence but cannot prove an internal electrical or mechanical repair, so a human stays in the loop.
 - JSON-file storage (with Upstash snapshot so data survives restarts) is for the demo. **Planned:** PostgreSQL with transactional settlement and a PayPal reconciliation job for production.
 
-## Testing instructions for judges
+## Testing instructions
 
-**Hosted demo:** open the *Website* link in this repository's About section. It runs against the PayPal sandbox. Log in to PayPal with the sandbox buyer account shown **right under the PayPal button** (also in the testing instructions on the Devpost page). It's a PayPal sandbox account with test money only. On the free hosting plan, the first load can take about a minute while the server wakes up.
+**Hosted demo:** open the *Website* link in this repository's About section. It runs against the PayPal sandbox. Log in to PayPal with the sandbox buyer account shown **right under the PayPal button**. It's a PayPal sandbox account with test money only. On the free hosting plan, the first load can take about a minute while the server wakes up.
 
 **Fastest way in:** open **`/guide`** in the app (the green bar at the top links to it). It has one-tap logins for the customer, Saathi, karigar and admin, the whole journey step by step, and a table of every page. The full written version is **[docs/DEMO-GUIDE.md](docs/DEMO-GUIDE.md)**.
 
@@ -240,12 +269,14 @@ The demo buttons open the karigar and Saathi of the most recent booking that's w
 Requirements: Node 20+.
 
 ```bash
-git clone https://github.com/meenakshisatpathy20-del/sudhaar-paypal-ai-hackathon.git
-cd sudhaar-paypal-ai-hackathon
+git clone https://github.com/meenakshisatpathy20-del/sudhaar-iim-calcutta.git
+cd sudhaar-iim-calcutta
 npm install
 cp .env.example .env      # fill in the values below
 npm run smoke:paypal      # optional: checks your PayPal sandbox credentials
 npm run dev               # http://localhost:3000
+npm run test:flow -- http://localhost:3000    # PayPal lifecycle + security checks
+npm run test:india -- http://localhost:3000   # UPI / card lifecycle, OTP lock, refunds, tips
 ```
 
 The app also runs with an **empty `.env`**: PayPal and AI calls are then simulated and the header shows yellow "Simulated" badges. Add sandbox keys so the real PayPal flow runs.
@@ -256,6 +287,12 @@ The app also runs with an **empty `.env`**: PayPal and AI calls are then simulat
 3. **Sandbox → Accounts**: create two *Personal* accounts for the karigar and the Saathi. Put their emails in `PAYPAL_KARIGAR_EMAIL` / `PAYPAL_SAATHI_EMAIL`. Use the default sandbox *Personal* account as the buyer (`PAYPAL_CUSTOMER_EMAIL`).
 4. Optional: add a webhook pointing to `https://<your-host>/api/paypal/webhook` and put its id in `PAYPAL_WEBHOOK_ID`.
 
+### Razorpay test-mode setup (UPI, cards, netbanking)
+1. [dashboard.razorpay.com](https://dashboard.razorpay.com/) → switch to **Test mode** → **Account & Settings → API keys** → generate a key. Put them in `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET`.
+2. Optional: **Webhooks** → add `https://<your-host>/api/razorpay/webhook` with `payment.authorized`, `payment.captured`, `refund.processed`, `transfer.processed`; put its secret in `RAZORPAY_WEBHOOK_SECRET`.
+3. Optional (the split): enable **Route**, create two linked accounts and put their ids in `RAZORPAY_KARIGAR_ACCOUNT` / `RAZORPAY_SAATHI_ACCOUNT`. Without them transfers are recorded as simulated.
+4. Test payments: UPI ID `success@razorpay`, or card `4111 1111 1111 1111` with any future expiry and CVV.
+
 ### Environment variables
 | Variable | Required | Purpose |
 |---|---|---|
@@ -263,7 +300,11 @@ The app also runs with an **empty `.env`**: PayPal and AI calls are then simulat
 | `PAYPAL_KARIGAR_EMAIL`, `PAYPAL_SAATHI_EMAIL` | for real payouts | Sandbox personal accounts that receive payouts |
 | `PAYPAL_CUSTOMER_EMAIL` | optional | Invoice recipient fallback |
 | `PAYPAL_WEBHOOK_ID` | optional | Enables webhook signature verification |
-| `PAYPAL_DEMO_BUYER_EMAIL`, `PAYPAL_DEMO_BUYER_PASSWORD` | optional | A sandbox buyer login (test money) shown under the PayPal button for judges |
+| `PAYPAL_DEMO_BUYER_EMAIL`, `PAYPAL_DEMO_BUYER_PASSWORD` | optional | A sandbox buyer login (test money) shown under the PayPal button for testers |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | for real UPI / cards | Razorpay **test** keys (`rzp_test_…`); live keys are refused |
+| `RAZORPAY_WEBHOOK_SECRET` | optional | Verifies Razorpay webhooks |
+| `RAZORPAY_KARIGAR_ACCOUNT`, `RAZORPAY_SAATHI_ACCOUNT` | optional | Route linked accounts (`acc_…`) that receive the split |
+| `RAZORPAY_HOLD_MINUTES` | optional | How long Razorpay keeps an uncaptured payment (default 7200 = 5 days) |
 | `GEMINI_API_KEY` | for real AI + agent | Gemini API key from [Google AI Studio](https://aistudio.google.com/) (free tier available) |
 | `AI_MODEL` | optional | Defaults to `gemini-flash-latest` |
 | `SESSION_SECRET` | recommended in production | Signs login cookies. Render generates it (see `render.yaml`); locally a random one is saved in `DATA_DIR` |
@@ -280,6 +321,7 @@ app/(partner)/      Partner side (phone + PIN login per role): karigar app, saat
 app/api/            auth, me, quote, baskets, orders (+approve/action/price/price-decision/complaint/resolve/review/rate/tip), partner (me/online/location/profile/payouts), track, care (+return), coupons, applications, agent, karigars, admin, uploads, paypal/webhook
 components/         UI (shadcn/ui components, doodles, three.js hero, PayPal SDK v6 checkout, voice, map, Family Pay, Fix-or-Replace meter…)
 lib/
+  razorpay.ts       Razorpay client (Orders with manual capture, payment fetch/capture/refund, Route transfers, webhook signature)
   paypal.ts         PayPal REST client (Orders, Payments, Payouts, Invoicing, Catalog Products, Billing Plans, Subscriptions, Webhooks)
   care.ts           Sudhaar Care: plan setup, subscribe, confirm with PayPal, cancel, webhook updates
   coupons.ts        Coupon rules, capped at Sudhaar's share
@@ -305,9 +347,9 @@ postman/            Postman collection for the full flow
 scripts/            PayPal sandbox smoke test
 ```
 
-## From hackathon to startup idea:
+## From prototype to startup
 
-Sudhaar works end to end today as a demo on the PayPal sandbox. This is our plan to make it work for millions of households, and the facts it rests on.
+Sudhaar works end to end today as a demo on Razorpay test mode and the PayPal sandbox. This is our plan to make it work for millions of households, and the facts it rests on.
 
 **Why now**
 - The world generated a record **62 million tonnes of e-waste in 2022**, and only **22.3%** was documented as properly collected and recycled ([UN Global E-waste Monitor 2024](https://unitar.org/about/news-stories/press/global-e-waste-monitor-2024-electronic-waste-rising-five-times-faster-documented-e-waste-recycling)). Mixers, fans, phones and chargers are a big part of what Sudhaar repairs.
@@ -321,7 +363,7 @@ Sudhaar works end to end today as a demo on the PayPal sandbox. This is our plan
 
 **Payments at scale: an honest plan**
 - PayPal ended **domestic** payments inside India on 1 April 2021 and kept **cross-border** payments ([Business Today](https://www.businesstoday.in/amp/technology/story/paypal-says-to-shut-domestic-payments-business-in-india-286762-2021-02-05)). So for an Indian launch:
-  - local payments run on **UPI**, through an Indian payment partner;
+  - local payments run on **UPI, cards and netbanking through Razorpay** (built: manual-capture holds, Route split, refunds);
   - **PayPal powers Family Pay across borders**: a son in Dubai or a daughter in London pays for a parent's repair back home, with the same hold-until-delivery protection;
   - in countries where PayPal works domestically (the US, the UK, much of Europe), PayPal is the full rail, as built here. Every karigar then gets their own PayPal account through **PayPal's multiparty onboarding (Partner Referrals API)** instead of one platform payout account.
 
@@ -350,7 +392,6 @@ Sudhaar works end to end today as a demo on the PayPal sandbox. This is our plan
 - **Maps:** tiles come from OpenStreetMap's public tile server, which is fine for a demo; a launch would use a paid tile provider. The sample karigars are placed around each customer's location with their real offsets. Real karigars would have their real shop locations.
 - **Languages:** the customer app, the Karigar and Saathi apps, the join forms and the Family Pay page are translated; the Admin console stays in English.
 - Data lives in a JSON file (`data/db.json`) that is re-seeded automatically, so a fresh deploy always works.
-- Built from scratch during the hackathon submission period (October–November 2026).
 
 ## License
 [MIT](LICENSE)

@@ -39,7 +39,7 @@ Admin "Call" / "Call me" ─┴─► POST https://api.bolna.ai/call  (outbound:
 | Variable | What it is |
 |---|---|
 | `VOICE_API_TOKEN` | A long random secret you make up. Bolna sends it on every call to Sudhaar. Without it, all `/api/voice/*` endpoints answer 503. |
-| `APP_URL` | Your site, e.g. `https://sudhaar-mm59.onrender.com`. Used to build the PayPal pay link the agent reports. |
+| `APP_URL` | Your site, e.g. `https://your-sudhaar.onrender.com`. Used to build the PayPal pay link the agent reports. |
 | `VOICE_PHONE_NUMBER` | Optional. The number customers dial, shown on the home page and in Talk (e.g. `+91 80 1234 5678`). |
 | `BOLNA_API_KEY`, `BOLNA_AGENT_ID` | Optional. These turn on **"Ask Sudhaar to call me"** on the website (Bolna's outbound call API). |
 | `BOLNA_FROM_NUMBER` | Optional. The Bolna number used for outbound calls, if you have more than one. |
@@ -92,7 +92,7 @@ On Bolna's trial plan, outbound calls only reach **verified numbers**: verify yo
 ## 3. Try the APIs without Bolna
 
 ```bash
-SITE=https://sudhaar-mm59.onrender.com
+SITE=https://your-sudhaar.onrender.com
 TOKEN=...   # your VOICE_API_TOKEN
 
 curl -s "$SITE/api/voice/caller?token=$TOKEN&contact_number=%2B919999999999"
