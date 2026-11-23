@@ -7,8 +7,11 @@ import zlib from "node:zlib";
 // Redis), every write is copied there (gzipped, a moment after it happens) and restored on start,
 // so judges' bookings, claims and photos are still there the next day. Without them, nothing changes.
 
-const KEY = "sudhaar:db";
-const UPLOAD = (name: string) => `sudhaar:upload:${name}`;
+// Every key starts with a prefix, so several Sudhaar sites can share one Upstash database without
+// overwriting each other (this version defaults to "sudhaar-iim"; the original site uses "sudhaar").
+const PREFIX = (process.env.UPSTASH_KEY_PREFIX ?? "").trim() || "sudhaar-iim";
+const KEY = `${PREFIX}:db`;
+const UPLOAD = (name: string) => `${PREFIX}:upload:${name}`;
 const UPLOAD_TTL_S = 60 * 24 * 60 * 60;
 
 const cfg = () => ({ url: (process.env.UPSTASH_REDIS_REST_URL ?? "").trim().replace(/\/$/, ""), token: (process.env.UPSTASH_REDIS_REST_TOKEN ?? "").trim() });
